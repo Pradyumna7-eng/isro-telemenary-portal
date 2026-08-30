@@ -39,8 +39,8 @@ export class DataStore {
       console.warn("[DataStore] Failed to load runs_store.json:", e);
     }
 
-    if (this.components.length === 0) {
-      console.log("[DataStore] Initializing synthetic seed dataset...");
+    if (this.components.length < 1500 || !this.components[0]?.die_x) {
+      console.log("[DataStore] Initializing enriched multi-vehicle synthetic dataset with 1,800+ records...");
       this.generateSyntheticSeed();
     }
   }
@@ -89,11 +89,26 @@ export class DataStore {
 
   public generateSyntheticSeed(): void {
     const raw: ComponentRecord[] = [];
-    const configs: Record<string, { lots: number; perLot: number }> = {
-      LVM3: { lots: 12, perLot: 38 },
-      PSLV: { lots: 9, perLot: 36 },
-      SSLV: { lots: 5, perLot: 36 },
+    const configs: Record<string, { lots: number; perLot: number; defaultLimit: number; stageName: string }> = {
+      LVM3: { lots: 10, perLot: 45, defaultLimit: 55.0, stageName: "LVM3_M4_CRYOGENIC_BUS" },
+      PSLV: { lots: 8, perLot: 40, defaultLimit: 40.0, stageName: "PSLV_C58_EQUIPMENT_BAY" },
+      SSLV: { lots: 5, perLot: 36, defaultLimit: 30.0, stageName: "SSLV_D3_VTM_STAGE" },
+      GSLV: { lots: 7, perLot: 50, defaultLimit: 48.0, stageName: "GSLV_F14_CUS_AVIONICS" },
+      NGLV: { lots: 10, perLot: 50, defaultLimit: 50.0, stageName: "NGLV_SOORYA_CORE_BUS" },
     };
+
+    const SUBSYSTEMS = [
+      { name: "Avionics Guidance & Navigation (AGNU)", channel: "Inertial Laser Gyro Bus" },
+      { name: "Cryogenic Upper Stage Valve Actuator", channel: "Thermal Transient Sensor" },
+      { name: "S-Band Telemetry Transmitter (TTC-RF)", channel: "Static Leakage Sensor Channel" },
+      { name: "Solid Booster Ignition Sequencer (HS200)", channel: "Power Bus Shunt Monitor" },
+      { name: "Payload Separation Pyro Controller (PAS)", channel: "Pyro Circuit Sensor" },
+      { name: "Reaction Control Thruster Driver (RCS)", channel: "Valve Driver Impedance" },
+      { name: "Solar Array Drive Mechanism (SADM)", channel: "Slip-Ring Noise Sensor" },
+      { name: "Power Conditioning & Distribution (PCDU)", channel: "Main Bus Rail Sensor" },
+      { name: "Telemetry Multiplexer Array (TMUX-16)", channel: "Differential ADC Channel" },
+      { name: "Radiation Shield Silicon Sensor (RAD)", channel: "Silicon Die Leakage Array" }
+    ];
 
     let partIdx = 1;
     for (const [vehicle, cfg] of Object.entries(configs)) {
@@ -101,7 +116,16 @@ export class DataStore {
         const lotId = `${vehicle}_LOT_${String(lot).padStart(2, "0")}`;
         for (let p = 0; p < cfg.perLot; p++) {
           const compId = `${vehicle}-PART_${String(partIdx).padStart(3, "0")}`;
+          const sub = SUBSYSTEMS[(partIdx - 1) % SUBSYSTEMS.length];
           partIdx++;
+
+          // Spatial wafer coordinates (-14 to +14 die grid)
+          const angle = (p / cfg.perLot) * 2 * Math.PI + (lot * 0.45);
+          const radNorm = Math.sqrt((p + 0.5) / cfg.perLot);
+          const dieX = Number((radNorm * 14 * Math.cos(angle)).toFixed(1));
+          const dieY = Number((radNorm * 14 * Math.sin(angle)).toFixed(1));
+          const waferDist = Math.sqrt(dieX * dieX + dieY * dieY);
+          const isWaferEdge = waferDist > 11.5;
 
           const rand = Math.random();
           let id0 = 0, id24 = 0, id96 = 0, id168 = 0;
@@ -109,9 +133,9 @@ export class DataStore {
           let pd0 = 0, pd24 = 0, pd96 = 0, pd168 = 0;
           let emi = -75, rain = 1.0;
 
-          if (rand < 0.07) {
-            // Spatial parametric defect
-            id0 = 38.0 + Math.random() * 20.0;
+          if (compId.endsWith("PART_010") || (rand < 0.06) || (isWaferEdge && rand < 0.22)) {
+            // Spatial parametric defect (wafer edge micro-cracks / gate oxide pinhole)
+            id0 = 38.0 + Math.random() * 22.0;
             id24 = id0 + 1.0 + Math.random() * 3.0;
             id96 = id24 + 2.0 + Math.random() * 4.0;
             id168 = id96 + 2.0 + Math.random() * 6.0;
@@ -121,14 +145,14 @@ export class DataStore {
             lk96 = lk24 + 1.0 + Math.random() * 2.0;
             lk168 = lk96 + 1.0 + Math.random() * 3.0;
 
-            pd0 = 1.4 + Math.random() * 0.7;
+            pd0 = 1.45 + Math.random() * 0.6;
             pd24 = pd0 + 0.05;
             pd96 = pd24 + 0.08;
             pd168 = pd96 + 0.12;
             emi = -70 + Math.random() * 10;
-            rain = Math.random() * 4;
-          } else if (rand < 0.13) {
-            // Thermal Drift Violation
+            rain = Math.random() * 3;
+          } else if (compId.endsWith("PART_025") || (rand < 0.12)) {
+            // Thermal Drift Slope Violation (rapid thermal runaway across burn-in)
             id0 = 9.0 + Math.random() * 5.0;
             id24 = id0 + 14.0 + Math.random() * 12.0;
             id96 = id24 + 20.0 + Math.random() * 15.0;
@@ -144,42 +168,42 @@ export class DataStore {
             pd96 = pd24 + 0.3 + Math.random() * 0.3;
             pd168 = pd96 + 0.4 + Math.random() * 0.4;
             emi = -65 + Math.random() * 15;
-            rain = Math.random() * 5;
-          } else if (rand < 0.18) {
-            // Atmospheric / EMI noise trigger
-            id0 = 10.0 + Math.random() * 5.0;
-            id24 = id0 + 3.5 + Math.random() * 2.5;
-            id96 = id0 + 0.5 + Math.random() * 1.3;
-            id168 = id0 + 0.5 + Math.random() * 1.5;
+            rain = Math.random() * 4;
+          } else if (compId.endsWith("PART_088") || (rand < 0.17)) {
+            // Atmospheric / Ground Station EMI & Precipitation Noise trigger
+            id0 = 9.5 + Math.random() * 4.5;
+            id24 = id0 + 3.5 + Math.random() * 2.8;
+            id96 = id0 + 0.5 + Math.random() * 1.2;
+            id168 = id0 + 0.5 + Math.random() * 1.4;
 
-            lk0 = 1.8 + Math.random() * 1.2;
-            lk24 = lk0 + 1.5 + Math.random() * 1.5;
-            lk96 = lk0 + 0.2 + Math.random() * 0.6;
-            lk168 = lk0 + 0.3 + Math.random() * 0.6;
+            lk0 = 1.6 + Math.random() * 1.2;
+            lk24 = lk0 + 1.6 + Math.random() * 1.4;
+            lk96 = lk0 + 0.2 + Math.random() * 0.5;
+            lk168 = lk0 + 0.3 + Math.random() * 0.5;
 
-            pd0 = 1.18 + Math.random() * 0.14;
+            pd0 = 1.16 + Math.random() * 0.14;
             pd24 = pd0 + 0.1 + Math.random() * 0.15;
             pd96 = pd0 + 0.05;
             pd168 = pd0 + 0.06;
-            emi = -38 + Math.random() * 6;
-            rain = 14 + Math.random() * 10;
+            emi = -36 + Math.random() * 7;
+            rain = 15 + Math.random() * 12;
           } else {
-            // Nominal
-            id0 = 8.0 + Math.random() * 5.5;
-            id24 = id0 + 0.2 + Math.random() * 1.3;
-            id96 = id24 + 0.2 + Math.random() * 1.6;
-            id168 = id96 + 0.2 + Math.random() * 1.8;
+            // Nominal Space-Grade Qualified Silicon
+            id0 = 7.5 + Math.random() * 5.5;
+            id24 = id0 + 0.2 + Math.random() * 1.2;
+            id96 = id24 + 0.2 + Math.random() * 1.4;
+            id168 = id96 + 0.2 + Math.random() * 1.5;
 
-            lk0 = 1.2 + Math.random() * 1.6;
+            lk0 = 1.1 + Math.random() * 1.5;
             lk24 = lk0 + 0.1 + Math.random() * 0.4;
-            lk96 = lk24 + 0.1 + Math.random() * 0.6;
-            lk168 = lk96 + 0.1 + Math.random() * 0.7;
+            lk96 = lk24 + 0.1 + Math.random() * 0.5;
+            lk168 = lk96 + 0.1 + Math.random() * 0.6;
 
-            pd0 = 1.1 + Math.random() * 0.2;
-            pd24 = pd0 + 0.01 + Math.random() * 0.04;
-            pd96 = pd24 + 0.01 + Math.random() * 0.05;
-            pd168 = pd96 + 0.01 + Math.random() * 0.06;
-            emi = -80 + Math.random() * 10;
+            pd0 = 1.08 + Math.random() * 0.18;
+            pd24 = pd0 + 0.01 + Math.random() * 0.03;
+            pd96 = pd24 + 0.01 + Math.random() * 0.04;
+            pd168 = pd96 + 0.01 + Math.random() * 0.05;
+            emi = -82 + Math.random() * 10;
             rain = Math.random() * 2;
           }
 
@@ -187,6 +211,11 @@ export class DataStore {
             component_id: compId,
             lot_id: lotId,
             vehicle,
+            subsystem: sub.name,
+            sensing_channel: sub.channel,
+            die_x: dieX,
+            die_y: dieY,
+            wafer_id: `WAF-${vehicle.substring(0, 3)}-${String(lot).padStart(2, "0")}`,
             Iddq_uA_0h: Number(id0.toFixed(2)),
             Iddq_uA_24h: Number(id24.toFixed(2)),
             Iddq_uA_96h: Number(id96.toFixed(2)),

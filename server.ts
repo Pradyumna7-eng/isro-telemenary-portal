@@ -30,14 +30,15 @@ const VEHICLE_DEFAULTS: Record<string, any> = {
     passed: 412,
     rejects: 26,
     weather: 12,
-    lot_id: "Lot ID: LVM3_STAGE_02",
+    lot_id: "Lot ID: LVM3_M4_CRYOGENIC_BUS",
     max_iddq: "55.0 µA",
     wind_shear: "45 knots",
     emi_limit: "-80 dB",
     slope_limit: 55.0,
     slope_text: "LVM3 Safety Slope Limit (55.0 µA)",
     part10_iddq: "48.00 µA",
-    part25_drift: "39.00 µA"
+    part25_drift: "39.00 µA",
+    stages: ["S200 Solid Boosters", "L110 Vikas Liquid Core", "C25 Cryogenic Upper Stage", "Payload Fairing & Avionics"]
   },
   PSLV: {
     id: "PSLV",
@@ -46,14 +47,15 @@ const VEHICLE_DEFAULTS: Record<string, any> = {
     passed: 295,
     rejects: 18,
     weather: 7,
-    lot_id: "Lot ID: PSLV_C58_STAGE_03",
+    lot_id: "Lot ID: PSLV_C58_EQUIPMENT_BAY",
     max_iddq: "40.0 µA",
     wind_shear: "35 knots",
     emi_limit: "-70 dB",
     slope_limit: 40.0,
     slope_text: "PSLV Safety Slope Limit (40.0 µA)",
     part10_iddq: "36.50 µA",
-    part25_drift: "31.20 µA"
+    part25_drift: "31.20 µA",
+    stages: ["PS1 Solid Stage + 6 Strapons", "PS2 Vikas Liquid Engine", "PS3 Solid Rocket Motor", "PS4 Dual Liquid Stage"]
   },
   SSLV: {
     id: "SSLV",
@@ -62,14 +64,49 @@ const VEHICLE_DEFAULTS: Record<string, any> = {
     passed: 164,
     rejects: 12,
     weather: 4,
-    lot_id: "Lot ID: SSLV_D3_STAGE_01",
+    lot_id: "Lot ID: SSLV_D3_VTM_STAGE",
     max_iddq: "30.0 µA",
     wind_shear: "30 knots",
     emi_limit: "-60 dB",
     slope_limit: 30.0,
     slope_text: "SSLV Safety Slope Limit (30.0 µA)",
     part10_iddq: "27.80 µA",
-    part25_drift: "24.50 µA"
+    part25_drift: "24.50 µA",
+    stages: ["SS1 Solid Motor (87s)", "SS2 Solid Motor (113s)", "SS3 Solid Motor (107s)", "Velocity Trimming Module (VTM)"]
+  },
+  GSLV: {
+    id: "GSLV",
+    name: "GSLV Mk II (Geosynchronous Launch Vehicle)",
+    total_components: 350,
+    passed: 318,
+    rejects: 22,
+    weather: 10,
+    lot_id: "Lot ID: GSLV_F14_CUS_AVIONICS",
+    max_iddq: "48.0 µA",
+    wind_shear: "40 knots",
+    emi_limit: "-75 dB",
+    slope_limit: 48.0,
+    slope_text: "GSLV Safety Slope Limit (48.0 µA)",
+    part10_iddq: "43.20 µA",
+    part25_drift: "35.80 µA",
+    stages: ["GS1 Solid Stage + 4 Liquid Strapons", "GS2 High-Thrust Liquid Stage", "Cryogenic Upper Stage (CUS-12)", "Composite Payload Shroud"]
+  },
+  NGLV: {
+    id: "NGLV",
+    name: "NGLV SOORYA (Next-Gen Heavy Launcher)",
+    total_components: 500,
+    passed: 465,
+    rejects: 25,
+    weather: 10,
+    lot_id: "Lot ID: NGLV_SOORYA_CORE_BUS",
+    max_iddq: "50.0 µA",
+    wind_shear: "50 knots",
+    emi_limit: "-85 dB",
+    slope_limit: 50.0,
+    slope_text: "NGLV Safety Slope Limit (50.0 µA)",
+    part10_iddq: "46.00 µA",
+    part25_drift: "37.50 µA",
+    stages: ["Reusable Booster (Methane/LOX)", "Semi-Cryogenic Core Stage", "Cryogenic Upper Stage", "Payload Interface Ring"]
   }
 };
 
@@ -254,15 +291,138 @@ app.get("/api/telemetry", (req: Request, res: Response) => {
 
 // 5. Diagnostics Inspections API
 app.get("/api/diagnostics/inspections", (req: Request, res: Response) => {
-  const list = [
+  const vehicle = (req.query.vehicle as string || "LVM3").toUpperCase();
+  const comps = dataStore.getByVehicle(vehicle);
+  const list: any[] = [];
+
+  // Add key archetype parts first
+  list.push(
     { part_id: "PART_088", factor: "Thunderstorm EMI Pulse (-35 dB) & Rain (18.5 mm/hr)" },
     { part_id: "PART_010", factor: "Gate Oxide Pinholes / Substrate Micro-cracks" },
     { part_id: "PART_025", factor: "Predicted 168h Drift exceeds Calculated Safety Slope Limit" },
     { part_id: "PART_036", factor: "Wafer Edge Defect Cluster (CH-22)" },
     { part_id: "PART_048", factor: "Thermal Runaway Acceleration (Burn-in 24h)" },
     { part_id: "PART_001", factor: "Nominal Silicon Baseline Parameters Qualified" }
-  ];
+  );
+
+  // Add more from current vehicle dataset
+  comps.slice(0, 30).forEach(c => {
+    const pId = c.component_id.replace(`${vehicle}-`, "");
+    if (!list.some(x => x.part_id === pId)) {
+      list.push({
+        part_id: pId,
+        factor: c.final_explanation || c.explanation_A || c.explanation_B || "Nominal telemetry parameters"
+      });
+    }
+  });
+
   res.json(list);
+});
+
+// 5b. Spatial Wafer Map API for dynamic realistic visualization
+app.get("/api/telemetry/spatial-map", (req: Request, res: Response) => {
+  const vehicle = (req.query.vehicle as string || "LVM3").toUpperCase();
+  let comps = dataStore.getByVehicle(vehicle);
+  if (comps.length === 0) comps = dataStore.getAll().slice(0, 450);
+
+  const dies = comps.map(c => {
+    let status = "CLEARED";
+    if (c.weather_flag) status = "RE_SCREEN";
+    else if (c.final_flag) status = "REJECTED";
+
+    return {
+      part_id: c.component_id.replace(`${vehicle}-`, ""),
+      lot_id: c.lot_id,
+      die_x: c.die_x ?? 0,
+      die_y: c.die_y ?? 0,
+      wafer_id: c.wafer_id || "WAF-01",
+      subsystem: c.subsystem || "Avionics Guidance & Navigation",
+      channel: c.sensing_channel || "Static Leakage Sensor Channel",
+      iddq_0h: c.Iddq_uA_0h,
+      iddq_24h: c.Iddq_uA_24h,
+      iddq_168h: c.Iddq_uA_pred168h || (c.Iddq_uA_24h * 1.05),
+      anomaly_score: c.anomaly_score_A || 0.1,
+      flag_spatial: !!c.flag_A,
+      flag_drift: !!c.flag_B,
+      status
+    };
+  });
+
+  res.json({
+    vehicle,
+    total_dies: dies.length,
+    dies
+  });
+});
+
+// 5c. Multi-Point Time-Series Drift API for realistic curve animation
+app.get("/api/telemetry/drift-series", (req: Request, res: Response) => {
+  const vehicle = (req.query.vehicle as string || "LVM3").toUpperCase();
+  const base = VEHICLE_DEFAULTS[vehicle] || VEHICLE_DEFAULTS["LVM3"];
+  const slopeLimit = base.slope_limit || 55.0;
+
+  // Return curves for: Selected Part (or PART_025), Outlier PART_010, Weather PART_088, Nominal Baseline, and Confidence Bands
+  const selectedPart = req.query.partId as string || "PART_025";
+  const doc = dataStore.getById(selectedPart) || dataStore.getById(`${vehicle}-${selectedPart}`);
+
+  const v0 = doc ? doc.Iddq_uA_0h : 11.0;
+  const v24 = doc ? doc.Iddq_uA_24h : 24.5;
+  const v96 = doc?.Iddq_uA_96h || (v24 + (v24 - v0) * 2.8);
+  const v168 = doc?.Iddq_uA_pred168h || (v0 + (v24 - v0) / 24 * 168 * 1.15);
+
+  const hours = [0, 12, 24, 48, 72, 96, 120, 144, 168];
+
+  const interp = (h0: number, h24: number, h96: number, h168: number) => {
+    return hours.map(h => {
+      let val = h0;
+      if (h <= 24) {
+        val = h0 + (h24 - h0) * (h / 24);
+      } else if (h <= 96) {
+        val = h24 + (h96 - h24) * ((h - 24) / 72);
+      } else {
+        val = h96 + (h168 - h96) * ((h - 96) / 72);
+      }
+      return { hour: h, iddq_uA: Number(val.toFixed(2)) };
+    });
+  };
+
+  const selectedSeries = interp(v0, v24, v96, v168);
+  const nominalSeries = interp(8.5, 9.2, 9.8, 10.4);
+  const outlierSeries = interp(48.0, 50.2, 51.4, 53.0);
+  const weatherSeries = interp(10.2, 19.5, 11.2, 11.0);
+
+  res.json({
+    vehicle,
+    safety_slope_limit: slopeLimit,
+    selected_part_id: selectedPart,
+    selected_series: selectedSeries,
+    nominal_series: nominalSeries,
+    outlier_series: outlierSeries,
+    weather_series: weatherSeries,
+    confidence_upper: nominalSeries.map(p => ({ hour: p.hour, iddq_uA: Number((p.iddq_uA * 1.25).toFixed(2)) })),
+    confidence_lower: nominalSeries.map(p => ({ hour: p.hour, iddq_uA: Number((p.iddq_uA * 0.85).toFixed(2)) })),
+  });
+});
+
+// 5d. Rocket Subsystem Topology API
+app.get("/api/telemetry/topology", (req: Request, res: Response) => {
+  const vehicle = (req.query.vehicle as string || "LVM3").toUpperCase();
+  const base = VEHICLE_DEFAULTS[vehicle] || VEHICLE_DEFAULTS["LVM3"];
+
+  const subsystems = [
+    { id: "SYS_AGNU", name: "Avionics Guidance & Navigation", status: "NOMINAL", freq_hz: "100 Hz", load_pct: 42, health: 99.4, sensor_count: 64 },
+    { id: "SYS_CRYOCON", name: "Cryogenic Upper Stage Valve Controller", status: "NOMINAL", freq_hz: "50 Hz", load_pct: 38, health: 98.8, sensor_count: 48 },
+    { id: "SYS_TTC", name: "S-Band Telemetry RF Transmitter", status: "NOMINAL", freq_hz: "2.2 GHz", load_pct: 65, health: 99.1, sensor_count: 32 },
+    { id: "SYS_IGNITE", name: "Solid Booster Ignition Sequencer", status: "ARMED_NOMINAL", freq_hz: "1 kHz", load_pct: 28, health: 100.0, sensor_count: 24 },
+    { id: "SYS_PYRO", name: "Stage Separation Pyrotechnics", status: "STANDBY_SAFE", freq_hz: "10 Hz", load_pct: 15, health: 99.9, sensor_count: 18 },
+    { id: "SYS_RCS", name: "Reaction Control Thrusters", status: "ACTIVE_PULSE", freq_hz: "200 Hz", load_pct: 54, health: 97.6, sensor_count: 36 }
+  ];
+
+  res.json({
+    vehicle,
+    stages: base.stages || ["Stage 1", "Stage 2", "Stage 3", "Payload Bay"],
+    subsystems
+  });
 });
 
 app.get("/api/diagnostics/inspection/:partId", (req: Request, res: Response) => {
@@ -435,7 +595,7 @@ function parseCSV(text: string): Record<string, any>[] {
   return rows;
 }
 
-app.post("/api/upload", upload.single("file"), (req: Request, res: Response) => {
+app.post("/api/upload", upload.single("file") as any, (req: Request, res: Response) => {
   if (!req.file) {
     return res.status(400).json({ detail: "No CSV file uploaded" });
   }

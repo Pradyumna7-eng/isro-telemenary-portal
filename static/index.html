@@ -97,13 +97,20 @@
 
         <!-- Launch Vehicle Parametric Selector Bar -->
         <div class="vehicle-selector-bar">
-            <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                 <span style="font-weight: 600; font-size: 14px;">🚀 Launch Vehicle Profile:</span>
                 <select id="vehicleProfile" onchange="changeVehicleProfile()">
                     <option value="LVM3" selected>LVM3 (Heavy Payload Bus - 450 Components)</option>
                     <option value="PSLV">PSLV (Standard Polar Bus - 320 Components)</option>
                     <option value="SSLV">SSLV (Small Satellite Bus - 180 Components)</option>
+                    <option value="GSLV">GSLV Mk II (Cryogenic Stage Bus - 350 Components)</option>
+                    <option value="NGLV">NGLV SOORYA (Reusable Heavy Bus - 500 Components)</option>
                 </select>
+                <div class="telemetry-controls-group">
+                    <button class="btn-micro" id="btnToggleRadar" onclick="toggleRadarAnimation()">🌀 Radar Sweep: ON</button>
+                    <button class="btn-micro" id="btnToggleOsc" onclick="toggleOscAnimation()">〰️ Waveform: ON</button>
+                    <button class="btn-micro" id="btnPlaybackSpeed" onclick="cyclePlaybackSpeed()">⚡ 1.0x</button>
+                </div>
             </div>
             <div style="font-size: 13px; color: var(--text-muted);" id="vehicleSpecsDisplay">
                 Loading specifications...
@@ -115,12 +122,12 @@
             <div class="metric-card">
                 <h3>Tested Components</h3>
                 <div class="value" id="metricTotal">450</div>
-                <div style="color:var(--accent-green-bright); font-size:12px;" id="metricLot">Lot ID: LVM3_STAGE_02</div>
+                <div style="color:var(--accent-green-bright); font-size:12px;" id="metricLot">Lot ID: LVM3_M4_CRYOGENIC_BUS</div>
             </div>
             <div class="metric-card">
                 <h3>Passed Screening</h3>
                 <div class="value" style="color: var(--accent-green-bright);" id="metricPassed">412</div>
-                <div style="color:var(--accent-green-bright); font-size:12px;">✓ Cleared for Flight</div>
+                <div style="color:var(--accent-green-bright); font-size:12px;">✓ Space Qualified Flight Grade</div>
             </div>
             <div class="metric-card">
                 <h3>Hardware Rejects</h3>
@@ -130,114 +137,148 @@
             <div class="metric-card">
                 <h3>Atmospheric Triggers</h3>
                 <div class="value" style="color: var(--accent-purple);" id="metricWeather">12</div>
-                <div style="color:var(--accent-purple); font-size:12px;">▲ EMI & Attenuation Spikes</div>
+                <div style="color:var(--accent-purple); font-size:12px;">▲ EMI & Precipitation Noise</div>
             </div>
         </div>
 
         <!-- Visualizer Panels Grid -->
         <div class="panels-grid">
-            <!-- Module A -->
+            <!-- Module A: Moving Spatial Silicon Wafer & Die Radar Map -->
             <div class="panel">
                 <div class="panel-title">
-                    <span>Module A: Dynamic Spatial Outlier Vector</span>
-                    <span style="font-size: 11px; color: var(--text-muted);">2D Wafer Channel Map</span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>Module A: Dynamic Spatial Wafer & Die Vector</span>
+                        <span class="live-tag">LIVE SCAN</span>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn-micro" onclick="setWaferViewMode('wafer')" id="btnViewWafer">Wafer Disc</button>
+                        <button class="btn-micro" onclick="setWaferViewMode('scatter')" id="btnViewScatter">Scatter</button>
+                    </div>
                 </div>
-                <div class="panel-subtitle">Multi-parameter neighborhood screening across spatial silicon wafer channels.</div>
-                <div class="chart-container" id="moduleAChart">
-                    <svg viewBox="0 0 460 230" id="svgModuleA">
-                        <!-- Gridlines -->
-                        <line x1="60" y1="35" x2="440" y2="35" stroke="#30363d" stroke-dasharray="2 4" stroke-width="1"/>
-                        <line x1="60" y1="85" x2="440" y2="85" stroke="#30363d" stroke-dasharray="2 4" stroke-width="1"/>
-                        <line x1="60" y1="135" x2="440" y2="135" stroke="#30363d" stroke-dasharray="2 4" stroke-width="1"/>
+                <div class="panel-subtitle">
+                    Real-time multi-die silicon wafer coordinate screening. Rotating laser radar illuminates spatial edge defects & pinholes.
+                </div>
+                
+                <div class="chart-container" id="moduleAChart" style="position:relative; overflow:hidden;">
+                    <svg viewBox="0 0 480 260" id="svgModuleA" style="width:100%; height:260px;">
+                        <defs>
+                            <radialGradient id="waferGrad" cx="50%" cy="50%" r="50%">
+                                <stop offset="0%" stop-color="#121822"/>
+                                <stop offset="70%" stop-color="#0d1117"/>
+                                <stop offset="100%" stop-color="#161b22"/>
+                            </radialGradient>
+                            <linearGradient id="laserBeamGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="rgba(88, 166, 255, 0.45)"/>
+                                <stop offset="50%" stop-color="rgba(88, 166, 255, 0.15)"/>
+                                <stop offset="100%" stop-color="rgba(88, 166, 255, 0.2)"/>
+                            </linearGradient>
+                            <filter id="glowEffect" x="-20%" y="-20%" width="140%" height="140%">
+                                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                            </filter>
+                        </defs>
 
-                        <!-- Axes Lines -->
-                        <line x1="60" y1="180" x2="440" y2="180" stroke="#8b949e" stroke-width="1.5"/>
-                        <line x1="60" y1="20" x2="60" y2="180" stroke="#8b949e" stroke-width="1.5"/>
-
-                        <!-- Y-Axis Label & Ticks -->
-                        <text transform="rotate(-90)" x="-100" y="16" fill="#8b949e" font-size="10" font-weight="600" text-anchor="middle">Parametric Leakage Current Iddq (µA)</text>
-                        <text x="52" y="39" fill="#8b949e" font-size="9" text-anchor="end">50 µA</text>
-                        <text x="52" y="89" fill="#8b949e" font-size="9" text-anchor="end">35 µA</text>
-                        <text x="52" y="139" fill="#8b949e" font-size="9" text-anchor="end">20 µA</text>
-                        <text x="52" y="184" fill="#8b949e" font-size="9" text-anchor="end">0 µA</text>
-
-                        <!-- X-Axis Label & Ticks -->
-                        <text x="250" y="218" fill="#8b949e" font-size="11" font-weight="600" text-anchor="middle">Wafer Channel / Spatial Die Coordinate (X-Axis)</text>
-                        <text x="100" y="196" fill="#8b949e" font-size="9" text-anchor="middle">CH-02</text>
-                        <text x="160" y="196" fill="#8b949e" font-size="9" text-anchor="middle">CH-06</text>
-                        <text x="220" y="196" fill="#8b949e" font-size="9" text-anchor="middle">CH-10</text>
-                        <text x="280" y="196" fill="#8b949e" font-size="9" text-anchor="middle">CH-15</text>
-                        <text x="340" y="196" fill="#8b949e" font-size="9" text-anchor="middle">CH-20</text>
-                        <text x="400" y="196" fill="#8b949e" font-size="9" text-anchor="middle">CH-24</text>
-
-                        <!-- Spatial Outlier Limit Line -->
-                        <line x1="60" y1="65" x2="440" y2="65" stroke="#da3633" stroke-width="1.5" stroke-dasharray="4"/>
-                        <text x="435" y="58" fill="#da3633" font-size="9" font-weight="bold" text-anchor="end">Spatial Outlier Limit (3σ Cutoff)</text>
-
-                        <!-- Normal Component Points -->
-                        <circle cx="100" cy="155" r="4" fill="#58a6ff"/>
-                        <circle cx="160" cy="142" r="4" fill="#58a6ff"/>
-                        <circle cx="220" cy="158" r="4" fill="#58a6ff"/>
-                        <circle cx="280" cy="138" r="4" fill="#58a6ff"/>
-                        <circle cx="340" cy="150" r="4" fill="#58a6ff"/>
-                        <circle cx="400" cy="145" r="4" fill="#58a6ff"/>
-
-                        <!-- Outlier Point -->
-                        <circle cx="340" cy="42" r="7" fill="#da3633" stroke="#ffffff" stroke-width="1.5"/>
-                        <text x="240" y="38" fill="#da3633" font-size="10" font-weight="bold" id="moduleAPartLabel">PART_010 (48.0µA)</text>
+                        <!-- Dynamic Wafer or Scatter content injected via JavaScript -->
+                        <g id="waferBaseLayer"></g>
+                        <g id="waferGridLayer"></g>
+                        <g id="waferDiesLayer"></g>
+                        <g id="waferLaserLayer"></g>
+                        <g id="waferHudLayer"></g>
                     </svg>
+
+                    <!-- Interactive Floating HUD Tooltip -->
+                    <div id="waferTooltip" class="canvas-tooltip" style="display:none;"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:8px;">
+                    <span><span style="color:#58a6ff;">●</span> Nominal Die (<18µA)</span>
+                    <span><span style="color:#bc8cff;">●</span> Atmospheric Noise</span>
+                    <span><span style="color:#f0883e;">●</span> High Thermal Drift</span>
+                    <span><span style="color:#f85149;">●</span> 3σ Spatial Outlier</span>
+                    <span id="waferScanReadout" style="color:var(--accent-blue); font-weight:600;">Scan: Active CH-14</span>
                 </div>
             </div>
 
-            <!-- Dynamic Module B -->
+            <!-- Dynamic Module B: Moving Telemetry Drift Oscilloscope -->
             <div class="panel">
                 <div class="panel-title">
-                    <span>Module B: Time-Series Drift Predictor</span>
-                    <span style="font-size: 11px; color: var(--text-muted);">0h → 24h → 168h Forecast</span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>Module B: Accelerated Burn-in Drift Predictor</span>
+                        <span class="live-tag" style="border-color:var(--accent-green); color:var(--accent-green-bright);">OSCILLOSCOPE</span>
+                    </div>
+                    <div style="font-size:11px; color:var(--text-muted);" id="oscPartBadge">Inspecting: PART_025</div>
                 </div>
-                <div class="panel-subtitle">Predictive regression model taking <b>Value_0h</b> & <b>Value_24h</b> to forecast <b>Value_168h</b> drift against vehicle safety slope.</div>
-                <div class="chart-container" id="moduleBChart">
-                    <svg viewBox="0 0 460 230" id="svgModuleB">
-                        <!-- Gridlines -->
-                        <line x1="60" y1="35" x2="440" y2="35" stroke="#30363d" stroke-dasharray="2 4" stroke-width="1"/>
-                        <line x1="60" y1="85" x2="440" y2="85" stroke="#30363d" stroke-dasharray="2 4" stroke-width="1"/>
-                        <line x1="60" y1="135" x2="440" y2="135" stroke="#30363d" stroke-dasharray="2 4" stroke-width="1"/>
+                <div class="panel-subtitle">
+                    Real-time waveform sweep (0h → 24h → 96h → 168h) with confidence corridors & safety slope limit projection.
+                </div>
 
-                        <!-- Axes Lines -->
-                        <line x1="60" y1="180" x2="440" y2="180" stroke="#8b949e" stroke-width="1.5"/>
-                        <line x1="60" y1="20" x2="60" y2="180" stroke="#8b949e" stroke-width="1.5"/>
-                        
-                        <!-- Y-Axis Label & Ticks -->
-                        <text transform="rotate(-90)" x="-100" y="16" fill="#8b949e" font-size="10" font-weight="600" text-anchor="middle">Forecasted Drift / Iddq Current (µA)</text>
-                        <text x="52" y="39" fill="#8b949e" font-size="9" text-anchor="end">60 µA</text>
-                        <text x="52" y="89" fill="#8b949e" font-size="9" text-anchor="end">40 µA</text>
-                        <text x="52" y="139" fill="#8b949e" font-size="9" text-anchor="end">20 µA</text>
-                        <text x="52" y="184" fill="#8b949e" font-size="9" text-anchor="end">0 µA</text>
+                <div class="chart-container" id="moduleBChart" style="position:relative; overflow:hidden;">
+                    <svg viewBox="0 0 480 260" id="svgModuleB" style="width:100%; height:260px;">
+                        <defs>
+                            <linearGradient id="nominalCorridorGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="rgba(35, 134, 54, 0.25)"/>
+                                <stop offset="100%" stop-color="rgba(35, 134, 54, 0.04)"/>
+                            </linearGradient>
+                            <linearGradient id="rejectZoneGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="rgba(218, 54, 51, 0.22)"/>
+                                <stop offset="100%" stop-color="rgba(218, 54, 51, 0.02)"/>
+                            </linearGradient>
+                        </defs>
 
-                        <!-- X-Axis Label & Ticks -->
-                        <text x="250" y="218" fill="#8b949e" font-size="11" font-weight="600" text-anchor="middle">Accelerated Life Testing Duration (Hours)</text>
-                        <text x="90" y="196" fill="#8b949e" font-size="9" text-anchor="middle">0h (Initial)</text>
-                        <text x="220" y="196" fill="#8b949e" font-size="9" text-anchor="middle">24h (Burn-in)</text>
-                        <text x="390" y="196" fill="#8b949e" font-size="9" text-anchor="middle">168h (Flight Forecast)</text>
-
-                        <!-- Calculated Safety Slope Limit -->
-                        <line id="svgSlopeLine" x1="90" y1="150" x2="390" y2="70" stroke="#f0883e" stroke-width="1.5" stroke-dasharray="4 4"/>
-                        <text id="svgSlopeText" x="220" y="65" fill="#f0883e" font-size="9" font-weight="bold">LVM3 Safety Slope Limit (55.0 µA)</text>
-
-                        <!-- Normal Component Line -->
-                        <path d="M 90 155 L 220 150 L 390 145" stroke="#238636" stroke-width="2" fill="none"/>
-                        <circle cx="90" cy="155" r="3.5" fill="#238636"/>
-                        <circle cx="220" cy="150" r="3.5" fill="#238636"/>
-                        <circle cx="390" cy="145" r="4.5" fill="#238636"/>
-                        <text x="310" y="160" fill="#3fb950" font-size="9" id="svgSafePartText">PART_088 (Safe: 11.0µA)</text>
-
-                        <!-- Exceeding Safety Slope Line -->
-                        <path d="M 90 155 L 220 120 L 390 35" stroke="#da3633" stroke-width="2.5" stroke-dasharray="6 3" fill="none"/>
-                        <circle cx="90" cy="155" r="3.5" fill="#da3633"/>
-                        <circle cx="220" cy="120" r="4" fill="#da3633"/>
-                        <circle cx="390" cy="35" r="6" fill="#da3633" stroke="#ffffff" stroke-width="1.5"/>
-                        <text x="190" y="30" fill="#da3633" font-size="10" font-weight="bold" id="svgDriftPartText">🚨 PART_025 (Exceeds Safety Slope: 39.0µA)</text>
+                        <!-- Dynamic Curves & Playhead Layer -->
+                        <g id="driftGridLayer"></g>
+                        <g id="driftCorridorLayer"></g>
+                        <g id="driftCurvesLayer"></g>
+                        <g id="driftSweepLayer"></g>
+                        <g id="driftHudLayer"></g>
                     </svg>
+
+                    <!-- Realtime Oscilloscope Waveform at bottom -->
+                    <div class="oscilloscope-ticker">
+                        <span style="font-size:10px; color:var(--accent-blue); font-weight:bold; letter-spacing:0.5px;">LIVE BUS NOISE:</span>
+                        <span id="liveNoiseValue" style="font-family:monospace; font-size:11px; color:var(--text-bright);">12.42 µA | RMS: 0.18 µA | SNR: 44.2 dB</span>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:8px;">
+                    <span><span style="color:#238636;">―</span> Flight Envelope</span>
+                    <span><span style="color:#f0883e;">---</span> Safety Slope Cutoff</span>
+                    <span><span style="color:#f85149;">―</span> Active Selected Trajectory</span>
+                    <span><span style="color:#bc8cff;">―</span> EMI Recovery</span>
+                    <span id="driftSlopeValue" style="color:var(--accent-red-bright); font-weight:600;">Slope: +1.17 µA/hr</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. ROCKET SUBSYSTEM TOPOLOGY & LIVE SIGNAL BUS (Moving Parts Schematic) -->
+        <div class="panel">
+            <div class="panel-title">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span>🚀 Launch Vehicle Telemetry Subsystem & Sensor Topology</span>
+                    <span class="live-tag" style="border-color:var(--accent-blue); color:var(--accent-blue);">BUS MONITOR</span>
+                </div>
+                <span style="font-size: 12px; color: var(--text-muted);" id="topologyVehicleLabel">LVM3 Multi-Stage Bus</span>
+            </div>
+            <div class="panel-subtitle">
+                Interactive schematic of launch vehicle stages with real-time glowing signal paths, telemetry multiplexers, and sensor node health.
+            </div>
+
+            <div class="topology-container">
+                <div class="rocket-stages-view" id="rocketStagesSchematic">
+                    <!-- SVG Rocket Stages with Pulsing Bus Nodes -->
+                    <svg viewBox="0 0 860 140" id="svgRocketTopology" style="width:100%; height:140px;">
+                        <defs>
+                            <linearGradient id="rocketBodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="#21262d"/>
+                                <stop offset="100%" stop-color="#161b22"/>
+                            </linearGradient>
+                        </defs>
+                        <g id="rocketStagesLayer"></g>
+                        <g id="rocketSignalPulsesLayer"></g>
+                        <g id="rocketNodesLayer"></g>
+                    </svg>
+                </div>
+
+                <div class="subsystem-cards-grid" id="subsystemCardsGrid">
+                    <!-- Dynamic Subsystem Telemetry Cards injected via JS -->
                 </div>
             </div>
         </div>
@@ -345,6 +386,8 @@
                             <option value="LVM3">LVM3</option>
                             <option value="PSLV">PSLV</option>
                             <option value="SSLV">SSLV</option>
+                            <option value="GSLV">GSLV</option>
+                            <option value="NGLV">NGLV</option>
                         </select>
                     </div>
                     <div class="input-group">
