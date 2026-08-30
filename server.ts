@@ -643,6 +643,7 @@ app.post("/api/upload", upload.single("file") as any, (req: Request, res: Respon
 app.get("*", (req: Request, res: Response) => {
   const candidates = [
     path.join(STATIC_DIR, "index.html"),
+    path.join(BASE_DIR, "public", "index.html"),
     path.join(BASE_DIR, "index.html")
   ];
   for (const p of candidates) {
@@ -653,6 +654,10 @@ app.get("*", (req: Request, res: Response) => {
   res.send("<h2>ISRO Telemetry Portal is Live!</h2><p>index.html loaded.</p>");
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`ISRO Telemetry Server running on http://0.0.0.0:${PORT}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`ISRO Telemetry Server running on http://0.0.0.0:${PORT}`);
+  });
+}
+
+export default app;

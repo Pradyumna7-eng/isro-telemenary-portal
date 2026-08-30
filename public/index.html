@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ISRO Ground Station & Telemetry Portal</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div class="space-bg"></div>
+    <div class="stars-overlay"></div>
+
+    <!-- 1. LOGIN SCREEN OVERLAY -->
+    <div class="login-wrapper" id="loginScreen">
+        <div class="login-card">
+            <svg class="brand-logo-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="50" cy="50" r="44" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.6"/>
+                <ellipse cx="50" cy="50" rx="38" ry="14" stroke="#bc8cff" stroke-width="2" transform="rotate(-28 50 50)"/>
+                <path d="M 20 75 Q 45 40, 80 20" stroke="#ff9933" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="80" cy="20" r="4" fill="#ffffff" stroke="#ff9933" stroke-width="2"/>
+                <circle cx="50" cy="50" r="20" fill="url(#planetGrad)" stroke="#58a6ff" stroke-width="1.5"/>
+                <path d="M 30 50 H 70 M 50 30 V 70" stroke="#58a6ff" stroke-width="1" opacity="0.5"/>
+                <defs>
+                    <radialGradient id="planetGrad" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(42 42) scale(24)">
+                        <stop stop-color="#1f6beb"/>
+                        <stop offset="1" stop-color="#0e1117"/>
+                    </radialGradient>
+                </defs>
+            </svg>
+            <h2>ISRO Ground Station</h2>
+            <p>Telemetry Diagnostics & Screening Portal</p>
+            <form onsubmit="handleLogin(event)">
+                <div class="input-group">
+                    <label for="operatorId">Operator ID / Station Code</label>
+                    <input type="text" id="operatorId" required value="ISTRAC-OPERATOR-01">
+                </div>
+                <div class="input-group">
+                    <label for="accessKey">Mission Security Key</label>
+                    <input type="password" id="accessKey" required value="password123">
+                </div>
+                <button type="submit" class="btn-primary" style="width: 100%; padding: 14px;">
+                    AUTHENTICATE & ACCESS TELEMETRY
+                </button>
+            </form>
+            <div style="margin-top: 14px; font-size: 11px; color: var(--text-muted);">
+                ISTRAC Bengaluru | SDSC-SHAR Sriharikota | VSSC Thiruvananthapuram
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. MAIN DASHBOARD SCREEN -->
+    <div class="dashboard-container" id="dashboardScreen">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <svg style="width:42px; height:42px;" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="40" stroke="#58a6ff" stroke-width="2" fill="none"/>
+                    <path d="M 20 70 Q 45 35, 80 20" stroke="#ff9933" stroke-width="3" fill="none"/>
+                    <circle cx="80" cy="20" r="4" fill="#ffffff"/>
+                </svg>
+                <div>
+                    <h1 style="margin:0; font-size:20px; font-weight:700;">🛰️ ISRO Ground Station Telemetry & Anomaly Analytics</h1>
+                    <p style="margin:3px 0 0 0; font-size:12px; color:var(--text-muted);">Launch Vehicle Hardware & Atmospheric Noise Screening Engine</p>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <div class="operator-badge" id="operatorBadge">
+                    <span class="live-indicator"></span>
+                    <span id="operatorDisplay">ISTRAC-OPERATOR-01</span>
+                </div>
+                <button class="btn-secondary btn-live-pulse" id="btnLiveToggle" onclick="toggleLiveFeed()">
+                    ▶ Start Live Stream
+                </button>
+                <button class="btn-secondary" onclick="openScreenModal()">
+                    ⚡ Screen Component
+                </button>
+                <button class="btn-secondary" onclick="openDatasetModal()">
+                    📊 Dataset Export
+                </button>
+                <button class="btn-secondary" onclick="handleLogout()" style="color:var(--accent-red-bright);">
+                    LOGOUT
+                </button>
+            </div>
+        </div>
+
+        <!-- Live Telemetry Ticker HUD -->
+        <div id="liveTickerHUD" style="display:none; background: rgba(35, 134, 54, 0.12); border: 1px solid var(--accent-green); border-radius: 6px; padding: 8px 16px; margin-bottom: 20px; font-size: 12px; color: var(--accent-green-bright); display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="live-indicator"></span>
+                <b>LIVE GROUND STATION INGESTION:</b>
+                <span id="livePacketSummary">Receiving real-time telemetry packets from SDSC SHAR Tracking Station...</span>
+            </div>
+            <span id="livePacketTime" style="color: var(--text-muted); font-size: 11px;">T+00:00:00</span>
+        </div>
+
+        <!-- Launch Vehicle Parametric Selector Bar -->
+        <div class="vehicle-selector-bar">
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <span style="font-weight: 600; font-size: 14px;">🚀 Launch Vehicle Profile:</span>
+                <select id="vehicleProfile" onchange="changeVehicleProfile()">
+                    <option value="LVM3" selected>LVM3 (Heavy Payload Bus - 450 Components)</option>
+                    <option value="PSLV">PSLV (Standard Polar Bus - 320 Components)</option>
+                    <option value="SSLV">SSLV (Small Satellite Bus - 180 Components)</option>
+                    <option value="GSLV">GSLV Mk II (Cryogenic Stage Bus - 350 Components)</option>
+                    <option value="NGLV">NGLV SOORYA (Reusable Heavy Bus - 500 Components)</option>
+                </select>
+                <div class="telemetry-controls-group">
+                    <button class="btn-micro" id="btnToggleRadar" onclick="toggleRadarAnimation()">🌀 Radar Sweep: ON</button>
+                    <button class="btn-micro" id="btnToggleOsc" onclick="toggleOscAnimation()">〰️ Waveform: ON</button>
+                    <button class="btn-micro" id="btnPlaybackSpeed" onclick="cyclePlaybackSpeed()">⚡ 1.0x</button>
+                </div>
+            </div>
+            <div style="font-size: 13px; color: var(--text-muted);" id="vehicleSpecsDisplay">
+                Loading specifications...
+            </div>
+        </div>
+
+        <!-- Dynamic Metrics Grid -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <h3>Tested Components</h3>
+                <div class="value" id="metricTotal">450</div>
+                <div style="color:var(--accent-green-bright); font-size:12px;" id="metricLot">Lot ID: LVM3_M4_CRYOGENIC_BUS</div>
+            </div>
+            <div class="metric-card">
+                <h3>Passed Screening</h3>
+                <div class="value" style="color: var(--accent-green-bright);" id="metricPassed">412</div>
+                <div style="color:var(--accent-green-bright); font-size:12px;">✓ Space Qualified Flight Grade</div>
+            </div>
+            <div class="metric-card">
+                <h3>Hardware Rejects</h3>
+                <div class="value" style="color: var(--accent-red-bright);" id="metricRejects">26</div>
+                <div style="color:var(--accent-red-bright); font-size:12px;">▲ Outliers & Drift Violations</div>
+            </div>
+            <div class="metric-card">
+                <h3>Atmospheric Triggers</h3>
+                <div class="value" style="color: var(--accent-purple);" id="metricWeather">12</div>
+                <div style="color:var(--accent-purple); font-size:12px;">▲ EMI & Precipitation Noise</div>
+            </div>
+        </div>
+
+        <!-- Visualizer Panels Grid -->
+        <div class="panels-grid">
+            <!-- Module A: Moving Spatial Silicon Wafer & Die Radar Map -->
+            <div class="panel">
+                <div class="panel-title">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>Module A: Dynamic Spatial Wafer & Die Vector</span>
+                        <span class="live-tag">LIVE SCAN</span>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn-micro" onclick="setWaferViewMode('wafer')" id="btnViewWafer">Wafer Disc</button>
+                        <button class="btn-micro" onclick="setWaferViewMode('scatter')" id="btnViewScatter">Scatter</button>
+                    </div>
+                </div>
+                <div class="panel-subtitle">
+                    Real-time multi-die silicon wafer coordinate screening. Rotating laser radar illuminates spatial edge defects & pinholes.
+                </div>
+                
+                <div class="chart-container" id="moduleAChart" style="position:relative; overflow:hidden;">
+                    <svg viewBox="0 0 480 260" id="svgModuleA" style="width:100%; height:260px;">
+                        <defs>
+                            <radialGradient id="waferGrad" cx="50%" cy="50%" r="50%">
+                                <stop offset="0%" stop-color="#121822"/>
+                                <stop offset="70%" stop-color="#0d1117"/>
+                                <stop offset="100%" stop-color="#161b22"/>
+                            </radialGradient>
+                            <linearGradient id="laserBeamGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="rgba(88, 166, 255, 0.45)"/>
+                                <stop offset="50%" stop-color="rgba(88, 166, 255, 0.15)"/>
+                                <stop offset="100%" stop-color="rgba(88, 166, 255, 0.2)"/>
+                            </linearGradient>
+                            <filter id="glowEffect" x="-20%" y="-20%" width="140%" height="140%">
+                                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                            </filter>
+                        </defs>
+
+                        <!-- Dynamic Wafer or Scatter content injected via JavaScript -->
+                        <g id="waferBaseLayer"></g>
+                        <g id="waferGridLayer"></g>
+                        <g id="waferDiesLayer"></g>
+                        <g id="waferLaserLayer"></g>
+                        <g id="waferHudLayer"></g>
+                    </svg>
+
+                    <!-- Interactive Floating HUD Tooltip -->
+                    <div id="waferTooltip" class="canvas-tooltip" style="display:none;"></div>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:8px;">
+                    <span><span style="color:#58a6ff;">●</span> Nominal Die (<18µA)</span>
+                    <span><span style="color:#bc8cff;">●</span> Atmospheric Noise</span>
+                    <span><span style="color:#f0883e;">●</span> High Thermal Drift</span>
+                    <span><span style="color:#f85149;">●</span> 3σ Spatial Outlier</span>
+                    <span id="waferScanReadout" style="color:var(--accent-blue); font-weight:600;">Scan: Active CH-14</span>
+                </div>
+            </div>
+
+            <!-- Dynamic Module B: Moving Telemetry Drift Oscilloscope -->
+            <div class="panel">
+                <div class="panel-title">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>Module B: Accelerated Burn-in Drift Predictor</span>
+                        <span class="live-tag" style="border-color:var(--accent-green); color:var(--accent-green-bright);">OSCILLOSCOPE</span>
+                    </div>
+                    <div style="font-size:11px; color:var(--text-muted);" id="oscPartBadge">Inspecting: PART_025</div>
+                </div>
+                <div class="panel-subtitle">
+                    Real-time waveform sweep (0h → 24h → 96h → 168h) with confidence corridors & safety slope limit projection.
+                </div>
+
+                <div class="chart-container" id="moduleBChart" style="position:relative; overflow:hidden;">
+                    <svg viewBox="0 0 480 260" id="svgModuleB" style="width:100%; height:260px;">
+                        <defs>
+                            <linearGradient id="nominalCorridorGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="rgba(35, 134, 54, 0.25)"/>
+                                <stop offset="100%" stop-color="rgba(35, 134, 54, 0.04)"/>
+                            </linearGradient>
+                            <linearGradient id="rejectZoneGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="rgba(218, 54, 51, 0.22)"/>
+                                <stop offset="100%" stop-color="rgba(218, 54, 51, 0.02)"/>
+                            </linearGradient>
+                        </defs>
+
+                        <!-- Dynamic Curves & Playhead Layer -->
+                        <g id="driftGridLayer"></g>
+                        <g id="driftCorridorLayer"></g>
+                        <g id="driftCurvesLayer"></g>
+                        <g id="driftSweepLayer"></g>
+                        <g id="driftHudLayer"></g>
+                    </svg>
+
+                    <!-- Realtime Oscilloscope Waveform at bottom -->
+                    <div class="oscilloscope-ticker">
+                        <span style="font-size:10px; color:var(--accent-blue); font-weight:bold; letter-spacing:0.5px;">LIVE BUS NOISE:</span>
+                        <span id="liveNoiseValue" style="font-family:monospace; font-size:11px; color:var(--text-bright);">12.42 µA | RMS: 0.18 µA | SNR: 44.2 dB</span>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:8px;">
+                    <span><span style="color:#238636;">―</span> Flight Envelope</span>
+                    <span><span style="color:#f0883e;">---</span> Safety Slope Cutoff</span>
+                    <span><span style="color:#f85149;">―</span> Active Selected Trajectory</span>
+                    <span><span style="color:#bc8cff;">―</span> EMI Recovery</span>
+                    <span id="driftSlopeValue" style="color:var(--accent-red-bright); font-weight:600;">Slope: +1.17 µA/hr</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. ROCKET SUBSYSTEM TOPOLOGY & LIVE SIGNAL BUS (Moving Parts Schematic) -->
+        <div class="panel">
+            <div class="panel-title">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span>🚀 Launch Vehicle Telemetry Subsystem & Sensor Topology</span>
+                    <span class="live-tag" style="border-color:var(--accent-blue); color:var(--accent-blue);">BUS MONITOR</span>
+                </div>
+                <span style="font-size: 12px; color: var(--text-muted);" id="topologyVehicleLabel">LVM3 Multi-Stage Bus</span>
+            </div>
+            <div class="panel-subtitle">
+                Interactive schematic of launch vehicle stages with real-time glowing signal paths, telemetry multiplexers, and sensor node health.
+            </div>
+
+            <div class="topology-container">
+                <div class="rocket-stages-view" id="rocketStagesSchematic">
+                    <!-- SVG Rocket Stages with Pulsing Bus Nodes -->
+                    <svg viewBox="0 0 860 140" id="svgRocketTopology" style="width:100%; height:140px;">
+                        <defs>
+                            <linearGradient id="rocketBodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stop-color="#21262d"/>
+                                <stop offset="100%" stop-color="#161b22"/>
+                            </linearGradient>
+                        </defs>
+                        <g id="rocketStagesLayer"></g>
+                        <g id="rocketSignalPulsesLayer"></g>
+                        <g id="rocketNodesLayer"></g>
+                    </svg>
+                </div>
+
+                <div class="subsystem-cards-grid" id="subsystemCardsGrid">
+                    <!-- Dynamic Subsystem Telemetry Cards injected via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Diagnostics Register -->
+        <div class="panel">
+            <div class="panel-title">
+                <span>📋 Ground Station Diagnostics Register</span>
+                <span style="font-size: 12px; color: var(--text-muted);" id="tableRecordCount">Showing active telemetry records</span>
+            </div>
+            
+            <div class="register-toolbar">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                    <input type="text" id="searchInput" placeholder="🔍 Search Part ID, factor, or sensor..." style="min-width: 260px;" oninput="debounceSearch()">
+                    <select id="filterCategory" onchange="loadTelemetryData()">
+                        <option value="">All Categories</option>
+                        <option value="CLEARED_FLIGHT">Cleared for Flight</option>
+                        <option value="SPATIAL_OUTLIER">Spatial Outlier</option>
+                        <option value="THERMAL_DRIFT">Thermal Drift</option>
+                        <option value="ATMOSPHERIC_NOISE">Atmospheric Noise</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-secondary" onclick="prevPage()" id="btnPrevPage">◀ Prev</button>
+                    <button class="btn-secondary" onclick="nextPage()" id="btnNextPage">Next ▶</button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Part ID</th>
+                            <th>Category</th>
+                            <th>Sensing Channel</th>
+                            <th>Failure / Environmental Factor</th>
+                            <th>0h Iddq</th>
+                            <th>Pred 168h</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <!-- Injected dynamically via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Inspection Panel -->
+        <div class="panel">
+            <div class="panel-title">
+                <span>🔍 Deep Ground Station Diagnostic Inspection</span>
+                <span style="font-size: 12px; color: var(--accent-blue);">TreeSHAP Feature Attribution</span>
+            </div>
+            <div style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <label for="partSelect" style="font-size:13px; color:var(--text-muted);">Select Telemetry Unit for Audit:</label>
+                <select id="partSelect" onchange="updateAuditCard()" style="min-width: 300px;">
+                    <option value="PART_088" selected>PART_088 (Ground Station Rain/Thunder EMI)</option>
+                    <option value="PART_010">PART_010 (Hardware Spatial Pinholes)</option>
+                    <option value="PART_025">PART_025 (Exceeds Safety Slope Drift)</option>
+                </select>
+            </div>
+
+            <div class="audit-card">
+                <div class="audit-info">
+                    <div id="auditStatus" style="color: var(--accent-purple); font-weight: bold; font-size: 15px; margin-bottom: 8px;">
+                        STATUS: ATMOSPHERIC NOISE (RE-SCREEN)
+                    </div>
+                    <p><b>Component ID:</b> <span id="auditPartId">PART_088</span></p>
+                    <p><b>Anomaly Category:</b> <span id="auditCategory" style="color:var(--accent-purple);">Environmental Noise Drift</span></p>
+                    <p><b>Sensing Channel:</b> <span id="auditSensor">Ground Station EMI & Weather Sensor Array</span></p>
+                    <p><b>Atmospheric / Physical Factor:</b> <br><i id="auditFactor" style="color:var(--text-muted);">Thunderstorm EMI Pulse (-35 dB) & Rain Rate (18.5 mm/hr) at T=24h</i></p>
+                    <p><b>Forecast 168h Drift:</b> <span id="auditDrift" style="color:#3fb950; font-weight:bold;">11.00 µA (Transient Spike - Safe for Flight)</span></p>
+                </div>
+                <div>
+                    <h4 style="margin:0 0 14px 0; font-size:14px; color:var(--accent-blue);">Ground Station Factor Weighting (TreeSHAP Risk Attribution)</h4>
+                    
+                    <div id="bar1Label" style="font-size: 12px; margin-bottom: 6px;">Thunderstorm EMI Spike Weight (-65% Impact)</div>
+                    <div style="background:#30363d; border-radius:4px; height:12px; width:100%; margin-bottom:16px;">
+                        <div id="bar1" style="background:var(--accent-purple); height:100%; width:85%; border-radius:4px; transition: width 0.4s ease;"></div>
+                    </div>
+
+                    <div id="bar2Label" style="font-size: 12px; margin-bottom: 6px;">Rain Attenuation Humidity Rate (+25% Impact)</div>
+                    <div style="background:#30363d; border-radius:4px; height:12px; width:100%;">
+                        <div id="bar2" style="background:var(--accent-blue); height:100%; width:40%; border-radius:4px; transition: width 0.4s ease;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- MODAL 1: SCREEN NEW COMPONENT -->
+    <div class="modal-overlay" id="screenModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>⚡ Screen Telemetry Component (ML Engine)</h3>
+                <button class="modal-close" onclick="closeScreenModal()">✕</button>
+            </div>
+            <form onsubmit="handleScreenComponent(event)">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                    <div class="input-group">
+                        <label>Vehicle Type</label>
+                        <select id="screenVehicle">
+                            <option value="LVM3">LVM3</option>
+                            <option value="PSLV">PSLV</option>
+                            <option value="SSLV">SSLV</option>
+                            <option value="GSLV">GSLV</option>
+                            <option value="NGLV">NGLV</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Custom Part ID</label>
+                        <input type="text" id="screenPartId" placeholder="e.g. PART_999" value="PART_999">
+                    </div>
+                    <div class="input-group">
+                        <label>0h Baseline Iddq (µA)</label>
+                        <input type="number" step="0.01" id="screenIddq0" required value="10.5">
+                    </div>
+                    <div class="input-group">
+                        <label>24h Burn-in Iddq (µA)</label>
+                        <input type="number" step="0.01" id="screenIddq24" required value="22.0">
+                    </div>
+                    <div class="input-group">
+                        <label>Ground Station EMI (dB)</label>
+                        <input type="number" step="0.1" id="screenEmi" value="-80.0">
+                    </div>
+                    <div class="input-group">
+                        <label>Rain Rate (mm/hr)</label>
+                        <input type="number" step="0.1" id="screenRain" value="0.0">
+                    </div>
+                </div>
+
+                <div id="screenResultBox" style="display:none; margin: 16px 0; padding: 14px; background: rgba(14, 17, 23, 0.9); border-radius: 8px; border: 1px solid var(--border-color);">
+                    <!-- Dynamic evaluation injected here -->
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button type="button" class="btn-secondary" onclick="closeScreenModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">RUN ML SCREENING</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL 2: DATASET MANAGEMENT & EXPORT -->
+    <div class="modal-overlay" id="datasetModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>📊 ISRO Qualification Dataset Pipeline</h3>
+                <button class="modal-close" onclick="closeDatasetModal()">✕</button>
+            </div>
+            <div>
+                <p style="font-size: 13px; color: var(--text-muted); margin-top: 0;">
+                    Comprehensive flight qualification dataset containing accelerated burn-in telemetry (0h, 24h, 168h), wafer spatial coordinates, environmental transient markers, and TreeSHAP risk weights.
+                </p>
+                <div id="datasetStatsBox" style="background: rgba(14, 17, 23, 0.8); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; margin-bottom: 20px;">
+                    Loading dataset statistics...
+                </div>
+
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    <button onclick="downloadClientCSV()" class="btn-primary" style="cursor: pointer;">
+                        📥 Download CSV Dataset
+                    </button>
+                    <button onclick="downloadClientJSON()" class="btn-secondary" style="cursor: pointer;">
+                        📥 Download JSON
+                    </button>
+                    <button class="btn-secondary" onclick="handleRegenerateDataset()" style="cursor: pointer;">
+                        🔄 Re-generate 1000+ Records
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast">Operation completed successfully.</div>
+
+    <script src="app.js"></script>
+</body>
+</html>

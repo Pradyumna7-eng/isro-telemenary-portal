@@ -9,5 +9,5 @@
     "forceConsistentCasingInFileNames": true,
     "noEmit": true
   },
-  "include": ["server.ts", "data_store.ts", "pipeline.ts"]
+  "include": ["server.ts", "data_store.ts", "pipeline.ts", "api/**/*.ts"]
 }
