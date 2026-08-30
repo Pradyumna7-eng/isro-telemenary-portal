@@ -18,9 +18,11 @@ class FallbackCollection:
         if os.path.exists(self.data_file):
             try:
                 with open(self.data_file, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+                    data = json.load(f)
+                    if data and len(data) > 0:
+                        return data
             except Exception:
-                return []
+                pass
         return []
 
     def _save(self):
@@ -116,14 +118,22 @@ def get_client():
             _use_fallback = True
             return None
         try:
+            import certifi
             from pymongo import MongoClient
             from pymongo.server_api import ServerApi
-            client = MongoClient(MONGO_URI, server_api=ServerApi("1"), serverSelectionTimeoutMS=2000)
+            
+            # Using certifi for secure TLS/SSL handshake across Linux & Cloud containers
+            client = MongoClient(
+                MONGO_URI,
+                server_api=ServerApi("1"),
+                tlsCAFile=certifi.where(),
+                serverSelectionTimeoutMS=5000
+            )
             client.admin.command('ping')
             _mongo_client = client
-            print("[DB] Connected successfully to MongoDB Atlas.")
+            print("[DB] Connected successfully to MongoDB Atlas with valid SSL certificate.")
         except Exception as e:
-            print(f"[DB] MongoDB Atlas not reachable ({e}). Switching to local persistent storage.")
+            print(f"[DB] MongoDB Atlas connection warning: {e}. Switching to persistent local engine.")
             _use_fallback = True
             return None
     return _mongo_client

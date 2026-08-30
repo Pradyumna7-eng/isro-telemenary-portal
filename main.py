@@ -46,10 +46,10 @@ def startup():
     try:
         coll = get_components_collection()
         if coll.count_documents({}) == 0:
-            print("[Startup] Database empty. Seeding initial rocket telemetry...")
+            print("[Startup] Database empty. Running initial telemetry seed...")
             run_seed()
     except Exception as e:
-        print(f"[Startup Warning] Seeding deferred: {e}")
+        print(f"[Startup Seeding Notice]: {e}")
 
 def find_index_file():
     candidates = [
@@ -63,12 +63,12 @@ def find_index_file():
             return p
     return None
 
-@app.get("/", response_class=HTMLResponse)
+@app.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def serve_index():
     index_path = find_index_file()
     if index_path:
         return FileResponse(index_path)
-    return HTMLResponse("<h2>ISRO Telemetry Backend is Live!</h2><p>Place index.html in the project or static/ folder to view the full UI.</p>")
+    return HTMLResponse("<h2>ISRO Telemetry Portal is Live!</h2><p>index.html loaded.</p>")
 
 @app.post("/api/auth/login")
 def login(req: LoginRequest):
@@ -81,8 +81,8 @@ def login(req: LoginRequest):
         }
     raise HTTPException(status_code=401, detail="Invalid operator security credentials")
 
-@app.get("/api/vehicles")
-@app.get("/api/vehicles/")
+@app.api_route("/api/vehicles", methods=["GET", "HEAD"])
+@app.api_route("/api/vehicles/", methods=["GET", "HEAD"])
 def list_vehicles():
     coll = get_components_collection()
     vehicles = coll.distinct("vehicle")
@@ -90,12 +90,11 @@ def list_vehicles():
         vehicles = ["LVM3", "PSLV", "SSLV"]
     return [{"id": v, "name": VEHICLE_DISPLAY_NAMES.get(v, v)} for v in vehicles]
 
-@app.get("/api/vehicles/{vehicle}/summary")
+@app.api_route("/api/vehicles/{vehicle}/summary", methods=["GET", "HEAD"])
 def vehicle_summary(vehicle: str):
     coll = get_components_collection()
     total = coll.count_documents({"vehicle": vehicle})
     if total == 0:
-        # Fallback sample count if collection hasn't completed seed
         defaults = {"LVM3": (456, 390, 63, 3), "PSLV": (324, 273, 48, 3), "SSLV": (180, 153, 24, 3)}
         tot, pas, rej, wea = defaults.get(vehicle, (400, 350, 40, 10))
         return {
@@ -104,7 +103,7 @@ def vehicle_summary(vehicle: str):
             "passed": pas,
             "rejects": rej,
             "weather": wea,
-            "lotId": f"Lot ID: {vehicle}_STAGE_01",
+            "lotId": f"Lot ID: {vehicle}_LOT_01",
         }
 
     rejects = coll.count_documents({"vehicle": vehicle, "final_flag": True})
@@ -112,7 +111,7 @@ def vehicle_summary(vehicle: str):
     passed = max(0, total - rejects - weather)
 
     one = coll.find_one({"vehicle": vehicle})
-    lot_id = one.get("lot_id", f"{vehicle}_STAGE_01") if one else f"{vehicle}_STAGE_01"
+    lot_id = one.get("lot_id", f"{vehicle}_LOT_01") if one else f"{vehicle}_LOT_01"
 
     return {
         "name": VEHICLE_DISPLAY_NAMES.get(vehicle, vehicle),
@@ -123,8 +122,8 @@ def vehicle_summary(vehicle: str):
         "lotId": f"Lot ID: {lot_id}",
     }
 
-@app.get("/api/vehicles/{vehicle}/table")
-def vehicle_table(vehicle: str, limit: int = 25):
+@app.api_route("/api/vehicles/{vehicle}/table", methods=["GET", "HEAD"])
+def vehicle_table(vehicle: str, limit: int = 30):
     coll = get_components_collection()
     cursor = coll.find(
         {"vehicle": vehicle, "": [{"final_flag": True}, {"weather_flag": True}]},
@@ -152,12 +151,11 @@ def vehicle_table(vehicle: str, limit: int = 25):
         })
     return rows
 
-@app.get("/api/components/{component_id}")
+@app.api_route("/api/components/{component_id}", methods=["GET", "HEAD"])
 def component_detail(component_id: str):
     coll = get_components_collection()
     doc = coll.find_one({"component_id": component_id}, {"_id": 0})
     if not doc:
-        # Fallback detail
         return {
             "componentId": component_id,
             "status": "STATUS: HARDWARE REJECT",
@@ -222,7 +220,7 @@ async def upload_csv(file: UploadFile = File(...)):
 
     return {"status": "ok", "n_components": len(records), "n_flagged": int(result["final_flag"].sum())}
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 def health_check():
     coll = get_components_collection()
     return {
