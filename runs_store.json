@@ -1,0 +1,11 @@
+[
+  {
+    "report": {
+      "total_screened": 960,
+      "flagged_A": 77,
+      "flagged_B": 62,
+      "final_rejected": 135
+    },
+    "n_components": 960
+  }
+]
