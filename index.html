@@ -246,7 +246,7 @@
                         <circle cx="40" cy="145" r="3" fill="#238636"/>
                         <circle cx="140" cy="140" r="3" fill="#238636"/>
                         <circle cx="350" cy="135" r="4" fill="#238636"/>
-                        <text x="260" y="150" fill="#3fb950" font-size="9" id="svgSafePartText">Nominal (Safe: 11.2uA)</text>
+                        <text x="260" y="150" fill="#3fb950" id="svgSafePartText">Nominal (Safe: 11.2uA)</text>
                         <path d="M 40 145 L 140 115 L 350 35" stroke="#da3633" stroke-width="2.5" stroke-dasharray="6 3" fill="none"/>
                         <circle cx="40" cy="145" r="3" fill="#da3633"/>
                         <circle cx="140" cy="115" r="4" fill="#da3633"/>
@@ -324,7 +324,7 @@
             const accessKey = document.getElementById("accessKey").value;
 
             try {
-                const res = await fetch(${API_BASE}/api/auth/login, {
+                const res = await fetch(`${API_BASE}/api/auth/login`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ operatorId, accessKey })
@@ -350,18 +350,17 @@
 
         async function loadVehicles() {
             const select = document.getElementById("vehicleProfile");
-            select.innerHTML = <option value="LVM3" selected>LVM3 (Heavy Payload Bus)</option><option value="PSLV">PSLV (Polar Satellite Bus)</option><option value="SSLV">SSLV (Small Satellite Bus)</option>;
+            select.innerHTML = `<option value="LVM3" selected>LVM3 (Heavy Payload Bus)</option><option value="PSLV">PSLV (Polar Satellite Bus)</option><option value="SSLV">SSLV (Small Satellite Bus)</option>`;
             try {
-                const res = await fetch(${API_BASE}/api/vehicles);
+                const res = await fetch(`${API_BASE}/api/vehicles`);
                 if (res.ok) {
                     const vehicles = await res.json();
                     if (vehicles && vehicles.length > 0) {
-                        select.innerHTML = vehicles.map(v => <option value=""></option>).join("");
+                        select.innerHTML = vehicles.map(v => `<option value="${v.id}">${v.name}</option>`).join("");
                     }
                 }
             } catch (e) { console.warn("Using default vehicles"); }
             changeVehicleProfile();
-        }
         }
 
         async function changeVehicleProfile() {
@@ -370,13 +369,13 @@
 
             try {
                 const [summary, table] = await Promise.all([
-                    fetch(${API_BASE}/api/vehicles//summary).then(r => r.json()),
-                    fetch(${API_BASE}/api/vehicles//table?limit=25).then(r => r.json()),
+                    fetch(`${API_BASE}/api/vehicles/${vehicle}/summary`).then(r => r.json()),
+                    fetch(`${API_BASE}/api/vehicles/${vehicle}/table?limit=25`).then(r => r.json()),
                 ]);
 
                 const specs = VEHICLE_SPECS[vehicle] || {};
                 document.getElementById("vehicleSpecsDisplay").innerHTML =
-                    Components: <b></b> | Safety Max Iddq: <b></b> | EMI Limit: <b></b>;
+                    `Components: <b>${summary.totalComponents}</b> | Safety Max Iddq: <b>${specs.maxIddq || '50.0 uA'}</b> | EMI Limit: <b>${specs.emiLimit || '-70 dB'}</b>`;
 
                 document.getElementById("metricTotal").innerText = summary.totalComponents;
                 document.getElementById("metricPassed").innerText = summary.passed;
@@ -388,34 +387,34 @@
                 const drift = table.find(r => r.categoryTag === "tag-drift");
                 if (spatial) {
                     document.getElementById("moduleAPartLabel").innerText =
-                        ${spatial.componentId} (uA);
+                        `${spatial.componentId} (${spatial.value0h != null ? spatial.value0h + 'uA' : '48.0uA'})`;
                 }
                 if (drift) {
                     const pred = typeof drift.predicted168h === "number" ? drift.predicted168h.toFixed(2) : drift.predicted168h;
                     document.getElementById("svgDriftPartText").innerText =
-                        PART_025 (Exceeds Safety Slope: uA);
+                        `${drift.componentId} (Exceeds Safety Slope: ${pred}uA)`;
                 }
                 const limitStr = specs.maxIddq || "50.0 uA";
-                document.getElementById("svgSlopeText").innerText = ${vehicle} Safety Slope Limit ();
+                document.getElementById("svgSlopeText").innerText = `${vehicle} Safety Slope Limit (${limitStr})`;
 
                 if (table.length === 0) {
-                    document.getElementById("tableBody").innerHTML = <tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">All components nominal! No anomalies detected.</td></tr>;
+                    document.getElementById("tableBody").innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">All components nominal! No anomalies detected.</td></tr>`;
                 } else {
                     document.getElementById("tableBody").innerHTML = table.map(row => 
-                        <tr>
-                            <td><b></b></td>
-                            <td><span class="badge-tag "></span></td>
+                        `<tr>
+                            <td><b>${row.componentId}</b></td>
+                            <td><span class="badge-tag ${row.categoryTag}">${row.category}</span></td>
                             <td>Iddq / Temp Sensors</td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                        </tr>
+                            <td>${row.reason}</td>
+                            <td>${row.value0h != null ? row.value0h + ' µA' : 'N/A'}</td>
+                            <td>${row.predicted168h != null ? row.predicted168h + ' µA' : 'N/A'}</td>
+                        </tr>`
                     ).join("");
                 }
 
                 const partSelect = document.getElementById("partSelect");
                 partSelect.innerHTML = table.map(
-                    r => <option value=""> ()</option>
+                    r => `<option value="${r.componentId}">${r.componentId} (${r.category})</option>`
                 ).join("");
                 if (table.length) updateAuditCard();
             } catch (e) {
@@ -435,33 +434,33 @@
             const selected = document.getElementById("partSelect").value;
             if (!selected) return;
             try {
-                const data = await fetch(${API_BASE}/api/components/).then(r => r.json());
+                const data = await fetch(`${API_BASE}/api/components/${selected}`).then(r => r.json());
 
                 const statusColor =
-                    data.status.includes("REJECT") ? "var(--accent-red)"
-                    : data.status.includes("ATMOSPHERIC") ? "var(--accent-purple)"
+                    data.status && data.status.includes("REJECT") ? "var(--accent-red)"
+                    : data.status && data.status.includes("ATMOSPHERIC") ? "var(--accent-purple)"
                     : "#3fb950";
 
-                document.getElementById("auditStatus").innerText = data.status;
+                document.getElementById("auditStatus").innerText = data.status || "STATUS: PASSED";
                 document.getElementById("auditStatus").style.color = statusColor;
                 document.getElementById("auditPartId").innerText = data.componentId;
-                document.getElementById("auditCategory").innerText = data.category;
+                document.getElementById("auditCategory").innerText = data.category || "Nominal Flight Certified";
                 document.getElementById("auditCategory").style.color = statusColor;
                 document.getElementById("auditSensor").innerText = "Iddq / Thermal / Leakage Multi-Channel";
-                document.getElementById("auditFactor").innerText = data.explanationA;
-                document.getElementById("auditDrift").innerText = data.explanationB;
+                document.getElementById("auditFactor").innerText = data.explanationA || "Nominal spatial distribution";
+                document.getElementById("auditDrift").innerText = data.explanationB || "Thermal drift within flight envelope";
                 document.getElementById("auditDrift").style.color = statusColor;
 
                 const shap1 = parseTopShap(data.shapIddq);
                 const shap2 = parseTopShap(data.shapLeakage);
                 const maxVal = Math.max(shap1.value, shap2.value, 0.001);
 
-                document.getElementById("bar1Label").innerText = Iddq driver: ;
-                document.getElementById("bar1").style.width = ${Math.min(100, Math.round((shap1.value / maxVal) * 100))}%;
+                document.getElementById("bar1Label").innerText = `Iddq driver: ${shap1.label}`;
+                document.getElementById("bar1").style.width = `${Math.min(100, Math.round((shap1.value / maxVal) * 100))}%`;
                 document.getElementById("bar1").style.backgroundColor = "var(--accent-purple)";
 
-                document.getElementById("bar2Label").innerText = Leakage driver: ;
-                document.getElementById("bar2").style.width = ${Math.min(100, Math.round((shap2.value / maxVal) * 100))}%;
+                document.getElementById("bar2Label").innerText = `Leakage driver: ${shap2.label}`;
+                document.getElementById("bar2").style.width = `${Math.min(100, Math.round((shap2.value / maxVal) * 100))}%`;
                 document.getElementById("bar2").style.backgroundColor = "var(--accent-blue)";
             } catch (e) {
                 console.error("Error updating audit card:", e);
@@ -475,19 +474,19 @@
             formData.append("file", file);
 
             try {
-                const res = await fetch(${API_BASE}/api/upload, {
+                const res = await fetch(`${API_BASE}/api/upload`, {
                     method: "POST",
                     body: formData
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    alert(Telemetry dataset uploaded successfully! Processed  components with  flags.);
+                    alert(`Telemetry dataset uploaded successfully! Processed ${data.n_components} components with ${data.n_flagged} flags.`);
                     loadVehicles();
                 } else {
-                    alert(Upload failed: );
+                    alert(`Upload failed: ${data.detail || 'Error processing file'}`);
                 }
             } catch (err) {
-                alert(Error uploading file: );
+                alert(`Error uploading file: ${err.message}`);
             }
         }
     </script>

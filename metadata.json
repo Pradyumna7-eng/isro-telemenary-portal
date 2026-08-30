@@ -1,0 +1,8 @@
+{
+  "name": "ISRO Ground Station Telemetry Portal",
+  "description": "ISRO Ground Station & Rocket Telemetry Diagnostics and Screening Portal for launch vehicle burn-in and anomaly screening across LVM3, PSLV, and SSLV.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
