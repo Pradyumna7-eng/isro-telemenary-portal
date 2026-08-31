@@ -476,8 +476,8 @@ app.get("/api/diagnostics/inspection/:partId", (req: Request, res: Response) => 
         { feature: "Ground Station EMI Coupling", impact_pct: -65, color: "var(--accent-purple)", description: "Thunderstorm electromagnetic pulse (-35 dB) during launch readiness testing." },
         { feature: "Rain Attenuation Humidity", impact_pct: 25, color: "var(--accent-blue)", description: "Precipitation rate of 18.5 mm/hr transiently altered dielectric surface." },
         { feature: "Parametric Static Leakage Rate", impact_pct: 15, color: "var(--accent-cyan)", description: "Core silicon leakage settled back to nominal baseline after weather clear." },
-        { feature: "Baseline Silicon Substrate Purity", impact_pct: 12, color: "var(--accent-green)", description: "Intrinsic silicon structure remains pristine and defect-free." },
-        { feature: "Thermal Dissipation Margin", impact_pct: 8, color: "var(--accent-green)", description: "Thermal dissipation characteristics meet spaceflight baseline." }
+        { feature: "Baseline Silicon Substrate Purity", impact_pct: 12, color: "var(--accent-green-bright)", description: "Intrinsic silicon structure remains pristine and defect-free." },
+        { feature: "Thermal Dissipation Margin", impact_pct: 8, color: "var(--accent-green-bright)", description: "Thermal dissipation characteristics meet spaceflight baseline." }
       ]
     });
   }
@@ -502,7 +502,7 @@ app.get("/api/diagnostics/inspection/:partId", (req: Request, res: Response) => 
         { feature: "Wafer Edge Radial Deviation", impact_pct: 28, color: "var(--accent-orange)", description: "Positioned within outer 10% wafer perimeter defect cluster." },
         { feature: "Substrate Microstructure Purity", impact_pct: 18, color: "var(--accent-orange)", description: "Potential micro-voids in gate oxide layer." },
         { feature: "Thermal Gradient Acceleration", impact_pct: 15, color: "var(--accent-blue)", description: "Temperature ramp rate during early test cycles." },
-        { feature: "Ground Station EMI Coupling", impact_pct: -6, color: "var(--accent-cyan)", description: "Minor background EMI isolation margin (-82 dB nominal)." }
+        { feature: "Ground Station EMI Coupling", impact_pct: -12, color: "var(--accent-cyan)", description: "Minor background EMI isolation margin (-82 dB nominal)." }
       ]
     });
   }
@@ -527,7 +527,7 @@ app.get("/api/diagnostics/inspection/:partId", (req: Request, res: Response) => 
         { feature: "Safety Slope Cutoff Deviation", impact_pct: 28, color: "var(--accent-red-bright)", description: "Projected 168h flight trajectory surpasses maximum allowable envelope." },
         { feature: "Thermal Dissipation Margin", impact_pct: 22, color: "var(--accent-orange)", description: "Elevated junction heating causing progressive threshold degradation." },
         { feature: "0h Parametric Static Leakage", impact_pct: 14, color: "var(--accent-blue)", description: "Moderate initial current that accelerated under thermal stress." },
-        { feature: "Ground Station EMI Coupling", impact_pct: -5, color: "var(--accent-cyan)", description: "Shielded ground coupling with no atmospheric interference." }
+        { feature: "Ground Station EMI Coupling", impact_pct: -10, color: "var(--accent-cyan)", description: "Shielded ground coupling with no atmospheric interference." }
       ]
     });
   }
@@ -548,11 +548,11 @@ app.get("/api/diagnostics/inspection/:partId", (req: Request, res: Response) => 
     max_limit: maxLimit,
     leakage_pct: leakagePct,
     factor_weights: [
-      { feature: "Baseline Silicon Substrate Purity", impact_pct: 52, color: "var(--accent-green)", description: "Uniform silicon lattice with ultra-low intrinsic defect density." },
-      { feature: "Parametric Static Leakage Rate", impact_pct: 34, color: "var(--accent-green)", description: "Iddq static current stable within 8-11 µA nominal flight corridor." },
+      { feature: "Baseline Silicon Substrate Purity", impact_pct: 52, color: "var(--accent-green-bright)", description: "Uniform silicon lattice with ultra-low intrinsic defect density." },
+      { feature: "Parametric Static Leakage Rate", impact_pct: 34, color: "var(--accent-green-bright)", description: "Iddq static current stable within 8-11 µA nominal flight corridor." },
       { feature: "Thermal Dissipation Margin", impact_pct: 18, color: "var(--accent-blue)", description: "Excellent heat dissipation during continuous 168h Arrhenius testing." },
-      { feature: "Ground Station EMI Coupling", impact_pct: -8, color: "var(--accent-cyan)", description: "Exceptional EMI suppression (>85 dB isolation from ground RF)." },
-      { feature: "Burn-in Aging Linearity", impact_pct: 7, color: "var(--accent-blue)", description: "Stable logarithmic aging curve with zero runaway signatures." }
+      { feature: "Ground Station EMI Coupling", impact_pct: -14, color: "var(--accent-cyan)", description: "Exceptional EMI suppression (>85 dB isolation from ground RF)." },
+      { feature: "Burn-in Aging Linearity", impact_pct: 8, color: "var(--accent-blue)", description: "Stable logarithmic aging curve with zero runaway signatures." }
     ]
   });
 });

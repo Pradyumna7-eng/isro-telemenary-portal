@@ -1623,10 +1623,10 @@ async function updateAuditCard() {
         max_limit: maxLim,
         leakage_pct: leakagePct,
         factor_weights: [
-            { feature: "Baseline Silicon Purity", impact_pct: 54, color: "var(--accent-green)", description: "Crystal lattice uniformity across central 300mm wafer zone" },
-            { feature: "Channel Impedance Stability", impact_pct: 32, color: "var(--accent-green)", description: "Differential impedance margin under thermal burn-in stress" },
-            { feature: "Burn-in Thermal Gradient", impact_pct: (h24 > h0 * 1.5 ? 28 : 12), color: "var(--accent-blue)", description: "Junction temperature dissipation coefficient during 24h bake" },
-            { feature: "Ground Station EMI Noise", impact_pct: (selected === "PART_088" ? -35 : -8), color: "var(--accent-cyan)", description: "Atmospheric coupling & launch pad umbilical noise attenuation" }
+            { feature: "Baseline Silicon Purity", impact_pct: 54, color: "var(--accent-green-bright)", description: "Crystal lattice uniformity across central 300mm wafer zone" },
+            { feature: "Channel Impedance Stability", impact_pct: 32, color: "var(--accent-green-bright)", description: "Differential impedance margin under thermal burn-in stress" },
+            { feature: "Burn-in Thermal Gradient", impact_pct: (h24 > h0 * 1.5 ? 28 : 14), color: "var(--accent-blue)", description: "Junction temperature dissipation coefficient during 24h bake" },
+            { feature: "Ground Station EMI Coupling", impact_pct: (selected === "PART_088" ? -65 : -12), color: (selected === "PART_088" ? "var(--accent-purple)" : "var(--accent-cyan)"), description: "Atmospheric coupling & launch pad umbilical noise attenuation" }
         ]
     };
     fallback.part_id = selected;
@@ -1639,10 +1639,10 @@ function renderTreeSHAP(weights) {
     container.innerHTML = "";
 
     const list = (weights && weights.length > 0) ? weights : [
-        { feature: "Baseline Silicon Purity", impact_pct: 50, color: "var(--accent-green)", description: "Crystal lattice integrity and spatial homogeneity" },
-        { feature: "Thermal Dissipation Margin", impact_pct: 28, color: "var(--accent-green)", description: "Thermal conductivity across avionics chassis" },
+        { feature: "Baseline Silicon Purity", impact_pct: 50, color: "var(--accent-green-bright)", description: "Crystal lattice integrity and spatial homogeneity" },
+        { feature: "Thermal Dissipation Margin", impact_pct: 28, color: "var(--accent-green-bright)", description: "Thermal conductivity across avionics chassis" },
         { feature: "Atmospheric Noise Rejection", impact_pct: 16, color: "var(--accent-blue)", description: "High-frequency RF transient rejection" },
-        { feature: "Ground Station EMI Exposure", impact_pct: -12, color: "var(--accent-cyan)", description: "Ground pad umbilical cable electromagnetic coupling" }
+        { feature: "Ground Station EMI Coupling", impact_pct: -12, color: "var(--accent-cyan)", description: "Ground pad umbilical cable electromagnetic coupling" }
     ];
 
     list.forEach(item => {
@@ -1650,6 +1650,11 @@ function renderTreeSHAP(weights) {
         const absVal = Math.abs(item.impact_pct);
         const sign = isNeg ? "−" : "+";
         const badgeClass = isNeg ? "impact-negative" : "impact-positive";
+        
+        let barColor = item.color;
+        if (!barColor) {
+            barColor = isNeg ? "var(--accent-cyan)" : "var(--accent-green-bright)";
+        }
 
         const row = document.createElement("div");
         row.className = "treeshap-row";
@@ -1659,16 +1664,17 @@ function renderTreeSHAP(weights) {
                 <span class="treeshap-badge ${badgeClass}">${sign}${absVal}% Impact</span>
             </div>
             <div class="treeshap-bar-bg">
-                <div class="treeshap-bar-fill" style="width: 0%; background-color: ${item.color || (isNeg ? 'var(--accent-cyan)' : 'var(--accent-green)')};"></div>
+                <div class="treeshap-bar-fill" style="width: 0%; background-color: ${barColor};"></div>
             </div>
-            ${item.description ? `<div class="treeshap-desc" style="font-size:10px; color:var(--text-muted); margin-top:2px;">${item.description}</div>` : ''}
+            ${item.description ? `<div class="treeshap-desc" style="font-size:11px; color:var(--text-muted); margin-top:3px;">${item.description}</div>` : ''}
         `;
         container.appendChild(row);
 
-        // Smooth entry animation for the fill width
+        // Smooth entry animation for the fill width (at least 14% to ensure solid visual presence)
+        const targetWidth = Math.min(100, Math.max(14, absVal));
         setTimeout(() => {
             const fill = row.querySelector(".treeshap-bar-fill");
-            if (fill) fill.style.width = `${Math.min(100, Math.max(12, absVal))}%`;
+            if (fill) fill.style.width = `${targetWidth}%`;
         }, 40);
     });
 }
