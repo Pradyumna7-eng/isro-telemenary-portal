@@ -169,6 +169,30 @@
             </div>
         </div>
 
+        <!-- Unified Universal Component Spotlight Bar -->
+        <div class="component-spotlight-bar" id="componentSpotlightBar">
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-weight:700; font-size:14px; color:var(--text-bright);">🎯 Active Component Spotlight:</span>
+                    <span class="part-badge-highlight" id="spotlightStatusPill">PART_025</span>
+                </div>
+                <select id="globalPartSelect" onchange="selectPartForInspection(this.value)" style="min-width:320px; font-weight:600;">
+                    <!-- Populated dynamically with all vehicle components -->
+                </select>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn-micro" onclick="stepComponent(-1)">◀ Prev</button>
+                    <button class="btn-micro" onclick="stepComponent(1)">Next ▶</button>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span style="font-size:12px; color:var(--text-muted);">Spotlight Filter:</span>
+                <button class="btn-filter-chip active" onclick="filterSpotlightList('ALL', this)">All</button>
+                <button class="btn-filter-chip" onclick="filterSpotlightList('CLEARED', this)">Space Qualified</button>
+                <button class="btn-filter-chip" onclick="filterSpotlightList('REJECT', this)">Rejections</button>
+                <button class="btn-filter-chip" onclick="filterSpotlightList('ATMOSPHERIC', this)">Atmospheric</button>
+            </div>
+        </div>
+
         <!-- Visualizer Panels Grid -->
         <div class="panels-grid">
             <!-- Module A: Moving Spatial Silicon Wafer & Die Radar Map -->
@@ -177,6 +201,7 @@
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span>Module A: Dynamic Spatial Wafer & Die Vector</span>
                         <span class="live-tag">LIVE SCAN</span>
+                        <span class="part-badge" id="waferPartBadge">Part: PART_025</span>
                     </div>
                     <div style="display:flex; gap:6px;">
                         <button class="btn-micro active" onclick="setWaferViewMode('wafer')" id="btnViewWafer">300mm Wafer</button>
@@ -184,25 +209,36 @@
                     </div>
                 </div>
                 <div class="panel-subtitle">
-                    Real-time multi-die silicon wafer coordinate screening. Rotating laser radar illuminates spatial edge defects & pinholes.
+                    Real-time 300mm silicon wafer coordinate screening with live rotating laser radar, spatial neighborhood correlation, and die reticle targeting.
                 </div>
                 
-                <div class="chart-container" id="moduleAChart" style="position:relative; overflow:hidden;">
-                    <svg viewBox="0 0 480 260" id="svgModuleA" style="width:100%; height:260px;">
+                <div class="chart-container" id="moduleAChart" style="position:relative; overflow:hidden; background:#080c14; border:1px solid #21262d; border-radius:6px;">
+                    <svg viewBox="0 0 540 280" id="svgModuleA" style="width:100%; height:280px;">
                         <defs>
-                            <radialGradient id="waferGrad" cx="50%" cy="50%" r="50%">
-                                <stop offset="0%" stop-color="#121822"/>
-                                <stop offset="70%" stop-color="#0d1117"/>
-                                <stop offset="100%" stop-color="#161b22"/>
+                            <radialGradient id="waferSubstrateGrad" cx="50%" cy="50%" r="50%">
+                                <stop offset="0%" stop-color="#161f30"/>
+                                <stop offset="60%" stop-color="#0c121d"/>
+                                <stop offset="100%" stop-color="#06090e"/>
+                            </radialGradient>
+                            <radialGradient id="waferBezelGrad" cx="50%" cy="50%" r="50%">
+                                <stop offset="90%" stop-color="rgba(33, 38, 45, 0.2)"/>
+                                <stop offset="100%" stop-color="rgba(56, 139, 253, 0.4)"/>
                             </radialGradient>
                             <linearGradient id="laserBeamGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="rgba(88, 166, 255, 0.45)"/>
-                                <stop offset="50%" stop-color="rgba(88, 166, 255, 0.15)"/>
-                                <stop offset="100%" stop-color="rgba(88, 166, 255, 0.2)"/>
+                                <stop offset="0%" stop-color="rgba(56, 139, 253, 0.55)"/>
+                                <stop offset="40%" stop-color="rgba(56, 139, 253, 0.18)"/>
+                                <stop offset="100%" stop-color="rgba(56, 139, 253, 0.02)"/>
                             </linearGradient>
-                            <filter id="glowEffect" x="-20%" y="-20%" width="140%" height="140%">
-                                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                            <filter id="glowEffect" x="-30%" y="-30%" width="160%" height="160%">
+                                <feGaussianBlur stdDeviation="3" result="blur" />
                                 <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                            </filter>
+                            <filter id="dieGlow" x="-50%" y="-50%" width="200%" height="200%">
+                                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                                <feMerge>
+                                    <feMergeNode in="blur" />
+                                    <feMergeNode in="SourceGraphic" />
+                                </feMerge>
                             </filter>
                         </defs>
 
@@ -218,11 +254,11 @@
                     <div id="waferTooltip" class="canvas-tooltip" style="display:none;"></div>
                 </div>
                 <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:8px; flex-wrap:wrap; gap:6px;">
-                    <span><span style="color:#58a6ff;">●</span> Nominal (<18µA)</span>
-                    <span><span style="color:#bc8cff;">●</span> Atmospheric Spike</span>
-                    <span><span style="color:#f0883e;">●</span> High Drift</span>
-                    <span><span style="color:#f85149;">●</span> 3σ Spatial Outlier</span>
-                    <span id="waferScanReadout" style="color:var(--accent-blue); font-weight:600;">Scan: Active CH-14</span>
+                    <span><span style="color:#388bfd; font-size:13px;">●</span> Qualified (&lt;18µA)</span>
+                    <span><span style="color:#bc8cff; font-size:13px;">●</span> Atmospheric Spike</span>
+                    <span><span style="color:#f0883e; font-size:13px;">●</span> Thermal Drift</span>
+                    <span><span style="color:#ff4d4d; font-size:13px;">●</span> 3σ Edge Reject</span>
+                    <span id="waferScanReadout" style="color:var(--accent-blue); font-weight:600;">Scan: Active CH-14 (120°)</span>
                 </div>
             </div>
 
@@ -232,6 +268,7 @@
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span>Module B: Accelerated Burn-in Drift Predictor</span>
                         <span class="live-tag" style="border-color:var(--accent-green); color:var(--accent-green-bright);">TIME-SERIES</span>
+                        <span class="part-badge" id="oscPartBadge">Part: PART_025</span>
                     </div>
                     <div style="display:flex; gap:6px; align-items:center;">
                         <button class="btn-micro active" onclick="setDriftViewMode('fleet')" id="btnViewFleet">Fleet Overlay</button>
@@ -273,7 +310,7 @@
                 <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:8px; flex-wrap:wrap; gap:6px;">
                     <span><span style="color:#238636;">―</span> Safe Fleet Corridor</span>
                     <span><span style="color:#f0883e;">---</span> Safety Slope Cutoff</span>
-                    <span><span style="color:#58a6ff; font-weight:bold;">―●</span> Selected Part</span>
+                    <span><span style="color:#58a6ff; font-weight:bold;">―●</span> Active Component</span>
                     <span><span style="color:#da3633;">---</span> Outliers</span>
                     <span id="driftSlopeValue" style="color:var(--accent-red-bright); font-weight:600;">Slope: +1.17 µA/hr</span>
                 </div>
@@ -370,11 +407,47 @@
             </div>
             <div style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                 <label for="partSelect" style="font-size:13px; color:var(--text-muted); font-weight:600;">Select Telemetry Unit for Inspection:</label>
-                <select id="partSelect" onchange="updateAuditCard()" style="min-width: 320px; font-weight:600;">
-                    <option value="PART_088" selected>PART_088 (Ground Station Rain/Thunder EMI)</option>
-                    <option value="PART_010">PART_010 (Hardware Spatial Pinholes)</option>
-                    <option value="PART_025">PART_025 (Exceeds Safety Slope Drift)</option>
+                <select id="partSelect" onchange="selectPartForInspection(this.value)" style="min-width: 320px; font-weight:600;">
+                    <!-- Synchronized with globalPartSelect -->
                 </select>
+            </div>
+
+            <!-- Ground Station Parametric Leakage Bar & Gauge -->
+            <div class="ground-station-leakage-card" style="margin-bottom: 18px; padding: 14px 18px; background: #161b22; border: 1px solid #30363d; border-radius: 8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-weight:700; font-size:13px; color:var(--text-bright);">⚡ Ground Station Parametric Leakage Gauge:</span>
+                        <span id="leakageStatusBadge" class="treeshap-badge impact-positive">Nominal Corridor</span>
+                    </div>
+                    <div style="font-size:12px; color:var(--text-muted);" id="leakageThresholdSummary">
+                        Peak: <b id="leakagePeakVal" style="color:var(--text-bright);">24.50 µA</b> / Limit: <b id="leakageLimitVal">55.0 µA</b> (<span id="leakagePctVal">44%</span>)
+                    </div>
+                </div>
+
+                <!-- 3-Phase Leakage Step Progression -->
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:12px;">
+                    <div class="leakage-phase-box">
+                        <div class="leakage-phase-label">0h Initial Baseline</div>
+                        <div class="leakage-phase-val" id="leakagePhase0h">11.00 µA</div>
+                    </div>
+                    <div class="leakage-phase-box">
+                        <div class="leakage-phase-label">24h Arrhenius Burn-in</div>
+                        <div class="leakage-phase-val" id="leakagePhase24h">24.50 µA</div>
+                    </div>
+                    <div class="leakage-phase-box">
+                        <div class="leakage-phase-label">168h Forecast Drift</div>
+                        <div class="leakage-phase-val" id="leakagePhase168h">39.00 µA</div>
+                    </div>
+                    <div class="leakage-phase-box">
+                        <div class="leakage-phase-label">Ground Station Cap</div>
+                        <div class="leakage-phase-val" style="color:var(--accent-orange);" id="leakagePhaseCap">55.00 µA</div>
+                    </div>
+                </div>
+
+                <!-- Overall Threshold Consumption Bar -->
+                <div class="treeshap-bar-bg" style="height:14px; background:#0d1117; border:1px solid #30363d;">
+                    <div id="leakageProgressBar" class="treeshap-bar-fill" style="width: 44%; background: linear-gradient(90deg, var(--accent-green) 0%, var(--accent-blue) 70%, var(--accent-orange) 100%);"></div>
+                </div>
             </div>
 
             <div class="audit-card">

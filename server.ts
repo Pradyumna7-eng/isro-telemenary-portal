@@ -446,7 +446,16 @@ app.get("/api/telemetry/topology", (req: Request, res: Response) => {
 
 app.get("/api/diagnostics/inspection/:partId", (req: Request, res: Response) => {
   const partId = req.params.partId;
-  const doc = dataStore.getById(partId) || dataStore.getById(`LVM3-${partId}`) || dataStore.getById(`PSLV-${partId}`) || dataStore.getById(`SSLV-${partId}`);
+  const vehicle = (req.query.vehicle as string || "LVM3").toUpperCase();
+  const vDefaults = VEHICLE_DEFAULTS[vehicle] || VEHICLE_DEFAULTS["LVM3"];
+  const maxLimit = vDefaults.slope_limit || 55.0;
+
+  const doc = dataStore.getById(partId) || dataStore.getById(`${vehicle}-${partId}`) || dataStore.getById(`LVM3-${partId}`) || dataStore.getById(`PSLV-${partId}`) || dataStore.getById(`SSLV-${partId}`);
+
+  const iddq0 = doc ? Number(doc.Iddq_uA_0h.toFixed(2)) : (partId === "PART_010" ? 48.0 : (partId === "PART_088" ? 10.2 : (partId === "PART_025" ? 11.0 : 8.8)));
+  const iddq24 = doc ? Number(doc.Iddq_uA_24h.toFixed(2)) : (partId === "PART_010" ? 50.2 : (partId === "PART_088" ? 19.5 : (partId === "PART_025" ? 24.5 : 9.4)));
+  const iddq168 = doc ? Number((doc.Iddq_uA_pred168h || doc.Iddq_uA_24h * 1.04).toFixed(2)) : (partId === "PART_010" ? 52.0 : (partId === "PART_088" ? 11.0 : (partId === "PART_025" ? 39.0 : 10.4)));
+  const leakagePct = Math.min(100, Math.round((iddq168 / maxLimit) * 100));
 
   if (partId === "PART_088" || doc?.weather_flag) {
     return res.json({
@@ -456,39 +465,49 @@ app.get("/api/diagnostics/inspection/:partId", (req: Request, res: Response) => 
       category: "Environmental Noise Drift",
       sensor: "Ground Station EMI & Weather Sensor Array",
       factor: "Thunderstorm EMI Pulse (-35 dB) & Rain Rate (18.5 mm/hr) at T=24h",
-      drift_text: "11.00 µA (Transient Spike - Safe for Flight)",
+      drift_text: `${iddq168.toFixed(2)} µA (Transient Spike - Safe for Flight)`,
       drift_color: "#3fb950",
+      iddq_0h: iddq0,
+      iddq_24h: iddq24,
+      iddq_168h: iddq168,
+      max_limit: maxLimit,
+      leakage_pct: leakagePct,
       factor_weights: [
-        { feature: "Thunderstorm EMI Coupling", impact_pct: -65, color: "var(--accent-purple)" },
-        { feature: "Rain Attenuation Humidity", impact_pct: 25, color: "var(--accent-blue)" },
-        { feature: "Ground Station Ambient Pulse", impact_pct: -15, color: "var(--accent-purple)" },
-        { feature: "Baseline Silicon Purity", impact_pct: 12, color: "var(--accent-green)" },
-        { feature: "Channel Thermal Dissipation", impact_pct: 8, color: "var(--accent-green)" }
+        { feature: "Ground Station EMI Coupling", impact_pct: -65, color: "var(--accent-purple)", description: "Thunderstorm electromagnetic pulse (-35 dB) during launch readiness testing." },
+        { feature: "Rain Attenuation Humidity", impact_pct: 25, color: "var(--accent-blue)", description: "Precipitation rate of 18.5 mm/hr transiently altered dielectric surface." },
+        { feature: "Parametric Static Leakage Rate", impact_pct: 15, color: "var(--accent-cyan)", description: "Core silicon leakage settled back to nominal baseline after weather clear." },
+        { feature: "Baseline Silicon Substrate Purity", impact_pct: 12, color: "var(--accent-green)", description: "Intrinsic silicon structure remains pristine and defect-free." },
+        { feature: "Thermal Dissipation Margin", impact_pct: 8, color: "var(--accent-green)", description: "Thermal dissipation characteristics meet spaceflight baseline." }
       ]
     });
   }
 
-  if (partId === "PART_010" || doc?.flag_A) {
+  if (partId === "PART_010" || doc?.flag_A || iddq0 > 35) {
     return res.json({
       part_id: partId,
-      status_text: "STATUS: HARDWARE REJECT",
+      status_text: "STATUS: HARDWARE REJECT (SPATIAL 3σ OUTLIER)",
       status_color: "var(--accent-red-bright)",
       category: "Spatial Parametric Outlier",
       sensor: "Iddq Static Leakage Sensor Channel",
-      factor: "Gate Oxide Pinholes / Substrate Micro-cracks",
-      drift_text: "Exceeds Z-Score Outlier Bound (52.0 µA)",
+      factor: "Gate Oxide Pinholes / Substrate Micro-cracks at Wafer Edge",
+      drift_text: `Exceeds Z-Score Outlier Bound (${iddq168.toFixed(2)} µA)`,
       drift_color: "var(--accent-red-bright)",
+      iddq_0h: iddq0,
+      iddq_24h: iddq24,
+      iddq_168h: iddq168,
+      max_limit: maxLimit,
+      leakage_pct: leakagePct,
       factor_weights: [
-        { feature: "0h Initial Parametric Leakage", impact_pct: 75, color: "var(--accent-red-bright)" },
-        { feature: "Wafer Edge Radial Deviation", impact_pct: 28, color: "var(--accent-orange)" },
-        { feature: "Thermal Gradient Acceleration", impact_pct: 15, color: "var(--accent-blue)" },
-        { feature: "Ground Station EMI Coupling", impact_pct: -8, color: "var(--accent-cyan)" },
-        { feature: "Lot Deviation Skew", impact_pct: 14, color: "var(--accent-orange)" }
+        { feature: "0h Parametric Static Leakage", impact_pct: 75, color: "var(--accent-red-bright)", description: "Severe baseline leakage exceeding 3σ statistical wafer distribution." },
+        { feature: "Wafer Edge Radial Deviation", impact_pct: 28, color: "var(--accent-orange)", description: "Positioned within outer 10% wafer perimeter defect cluster." },
+        { feature: "Substrate Microstructure Purity", impact_pct: 18, color: "var(--accent-orange)", description: "Potential micro-voids in gate oxide layer." },
+        { feature: "Thermal Gradient Acceleration", impact_pct: 15, color: "var(--accent-blue)", description: "Temperature ramp rate during early test cycles." },
+        { feature: "Ground Station EMI Coupling", impact_pct: -6, color: "var(--accent-cyan)", description: "Minor background EMI isolation margin (-82 dB nominal)." }
       ]
     });
   }
 
-  if (partId === "PART_025" || doc?.flag_B) {
+  if (partId === "PART_025" || doc?.flag_B || iddq168 > maxLimit || (iddq24 - iddq0) > 6.0) {
     return res.json({
       part_id: partId,
       status_text: "STATUS: EARLY REJECTION (SAFETY SLOPE EXCEEDED)",
@@ -496,20 +515,24 @@ app.get("/api/diagnostics/inspection/:partId", (req: Request, res: Response) => 
       category: "Time-Series Drift Slope Violation",
       sensor: "Thermal Transient Channel",
       factor: "Predicted 168h Drift exceeds Calculated Safety Slope Limit",
-      drift_text: "Forecast Slope Exceeds Limit (39.0 µA)",
+      drift_text: `Forecast Slope Exceeds Limit (${iddq168.toFixed(2)} µA)`,
       drift_color: "var(--accent-red-bright)",
+      iddq_0h: iddq0,
+      iddq_24h: iddq24,
+      iddq_168h: iddq168,
+      max_limit: maxLimit,
+      leakage_pct: leakagePct,
       factor_weights: [
-        { feature: "24h Burn-in Drift Delta", impact_pct: 68, color: "var(--accent-red-bright)" },
-        { feature: "Thermal Gradient Acceleration", impact_pct: 26, color: "var(--accent-orange)" },
-        { feature: "Safety Slope Cutoff Deviation", impact_pct: 22, color: "var(--accent-red-bright)" },
-        { feature: "0h Baseline Static Leakage", impact_pct: 12, color: "var(--accent-blue)" },
-        { feature: "Ground Station EMI Coupling", impact_pct: -5, color: "var(--accent-cyan)" }
+        { feature: "24h Burn-in Drift Delta", impact_pct: 68, color: "var(--accent-red-bright)", description: "Accelerated drift of +13.5 µA over first 24 hours of Arrhenius aging." },
+        { feature: "Safety Slope Cutoff Deviation", impact_pct: 28, color: "var(--accent-red-bright)", description: "Projected 168h flight trajectory surpasses maximum allowable envelope." },
+        { feature: "Thermal Dissipation Margin", impact_pct: 22, color: "var(--accent-orange)", description: "Elevated junction heating causing progressive threshold degradation." },
+        { feature: "0h Parametric Static Leakage", impact_pct: 14, color: "var(--accent-blue)", description: "Moderate initial current that accelerated under thermal stress." },
+        { feature: "Ground Station EMI Coupling", impact_pct: -5, color: "var(--accent-cyan)", description: "Shielded ground coupling with no atmospheric interference." }
       ]
     });
   }
 
   // Nominal qualified component
-  const pred168 = doc ? (doc.Iddq_uA_pred168h || doc.Iddq_uA_24h * 1.04) : 10.4;
   res.json({
     part_id: partId,
     status_text: "STATUS: CLEARED FOR FLIGHT (SPACE QUALIFIED)",
@@ -517,14 +540,19 @@ app.get("/api/diagnostics/inspection/:partId", (req: Request, res: Response) => 
     category: "Nominal Flight Telemetry",
     sensor: "Avionics Multi-channel Bus",
     factor: doc?.final_explanation || "All burn-in and spatial parameters within baseline limits",
-    drift_text: `${Number(pred168).toFixed(2)} µA (Space Qualified Baseline)`,
+    drift_text: `${iddq168.toFixed(2)} µA (Space Qualified Baseline)`,
     drift_color: "#3fb950",
+    iddq_0h: iddq0,
+    iddq_24h: iddq24,
+    iddq_168h: iddq168,
+    max_limit: maxLimit,
+    leakage_pct: leakagePct,
     factor_weights: [
-      { feature: "Baseline Silicon Purity", impact_pct: 52, color: "var(--accent-green)" },
-      { feature: "Channel Impedance Stability", impact_pct: 34, color: "var(--accent-green)" },
-      { feature: "Thermal Dissipation Margin", impact_pct: 18, color: "var(--accent-blue)" },
-      { feature: "Ground Station EMI Suppression", impact_pct: -12, color: "var(--accent-cyan)" },
-      { feature: "Burn-in Linearity", impact_pct: 8, color: "var(--accent-blue)" }
+      { feature: "Baseline Silicon Substrate Purity", impact_pct: 52, color: "var(--accent-green)", description: "Uniform silicon lattice with ultra-low intrinsic defect density." },
+      { feature: "Parametric Static Leakage Rate", impact_pct: 34, color: "var(--accent-green)", description: "Iddq static current stable within 8-11 µA nominal flight corridor." },
+      { feature: "Thermal Dissipation Margin", impact_pct: 18, color: "var(--accent-blue)", description: "Excellent heat dissipation during continuous 168h Arrhenius testing." },
+      { feature: "Ground Station EMI Coupling", impact_pct: -8, color: "var(--accent-cyan)", description: "Exceptional EMI suppression (>85 dB isolation from ground RF)." },
+      { feature: "Burn-in Aging Linearity", impact_pct: 7, color: "var(--accent-blue)", description: "Stable logarithmic aging curve with zero runaway signatures." }
     ]
   });
 });

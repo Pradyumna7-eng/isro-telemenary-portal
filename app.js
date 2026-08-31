@@ -432,6 +432,7 @@ async function changeVehicleProfile() {
             loadDriftSeriesData();
             loadTopologyData();
             loadTelemetryData();
+            loadInspectionOptions();
             return;
         }
     } catch (err) {
@@ -444,6 +445,7 @@ async function changeVehicleProfile() {
     loadDriftSeriesData();
     loadTopologyData();
     loadTelemetryData();
+    loadInspectionOptions();
 }
 
 function updateVehicleView() {
@@ -595,39 +597,61 @@ function renderModuleA() {
     laserLayer.innerHTML = "";
     hudLayer.innerHTML = "";
 
-    const cx = 240;
-    const cy = 130;
-    const waferRadius = 105;
+    const badge = document.getElementById("waferPartBadge");
+    if (badge) badge.innerText = `Active: ${selectedAuditPart}`;
+
+    const cx = 270;
+    const cy = 140;
+    const waferRadius = 116;
 
     if (waferViewMode === "wafer") {
-        // Render 300mm Silicon Wafer Disc
+        // Render 300mm Silicon Wafer Disc with High-Visibility ISRO Radar Aesthetics
+        let degreeTicks = "";
+        for (let deg = 0; deg < 360; deg += 30) {
+            const rad = (deg - 90) * (Math.PI / 180);
+            const x1 = cx + Math.cos(rad) * (waferRadius + 2);
+            const y1 = cy + Math.sin(rad) * (waferRadius + 2);
+            const x2 = cx + Math.cos(rad) * (waferRadius + 8);
+            const y2 = cy + Math.sin(rad) * (waferRadius + 8);
+            const textX = cx + Math.cos(rad) * (waferRadius + 15);
+            const textY = cy + Math.sin(rad) * (waferRadius + 15);
+            degreeTicks += `
+                <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#58a6ff" stroke-width="1.2" opacity="0.6"/>
+                <text x="${textX}" y="${textY + 3}" fill="#8b949e" font-size="7" font-family="monospace" text-anchor="middle">${deg}°</text>
+            `;
+        }
+
         baseLayer.innerHTML = `
             <!-- Wafer Shadow & Background Outer Body -->
-            <circle cx="${cx}" cy="${cy}" r="${waferRadius + 4}" fill="#080b10" stroke="#30363d" stroke-width="1.5" />
-            <circle cx="${cx}" cy="${cy}" r="${waferRadius}" fill="url(#waferGrad)" stroke="#58a6ff" stroke-width="2" opacity="0.9" />
+            <circle cx="${cx}" cy="${cy}" r="${waferRadius + 10}" fill="#05080e" stroke="#21262d" stroke-width="1.5" />
+            <circle cx="${cx}" cy="${cy}" r="${waferRadius}" fill="url(#waferSubstrateGrad)" stroke="#388bfd" stroke-width="2.2" opacity="0.95" />
+            <circle cx="${cx}" cy="${cy}" r="${waferRadius}" fill="url(#waferBezelGrad)" stroke="none" />
             
-            <!-- Alignment Notch at Bottom -->
-            <path d="M ${cx - 10} ${cy + waferRadius} Q ${cx} ${cy + waferRadius - 8} ${cx + 10} ${cy + waferRadius}" fill="#080b10" stroke="#58a6ff" stroke-width="2"/>
+            <!-- Alignment Flat / Notch at Bottom -->
+            <path d="M ${cx - 14} ${cy + waferRadius} Q ${cx} ${cy + waferRadius - 10} ${cx + 14} ${cy + waferRadius}" fill="#05080e" stroke="#388bfd" stroke-width="2.5"/>
             
+            <!-- Degree Ticks -->
+            ${degreeTicks}
+
             <!-- Concentric Wafer Zones -->
-            <circle cx="${cx}" cy="${cy}" r="${waferRadius * 0.35}" fill="none" stroke="#30363d" stroke-width="1" stroke-dasharray="2 3" opacity="0.6"/>
-            <circle cx="${cx}" cy="${cy}" r="${waferRadius * 0.70}" fill="none" stroke="#30363d" stroke-width="1" stroke-dasharray="3 4" opacity="0.6"/>
-            <circle cx="${cx}" cy="${cy}" r="${waferRadius * 0.90}" fill="none" stroke="#da3633" stroke-width="1" stroke-dasharray="4 4" opacity="0.45"/>
+            <circle cx="${cx}" cy="${cy}" r="${waferRadius * 0.35}" fill="none" stroke="#30363d" stroke-width="1.2" stroke-dasharray="2 3" opacity="0.75"/>
+            <circle cx="${cx}" cy="${cy}" r="${waferRadius * 0.70}" fill="none" stroke="#388bfd" stroke-width="1.2" stroke-dasharray="3 4" opacity="0.5"/>
+            <circle cx="${cx}" cy="${cy}" r="${waferRadius * 0.90}" fill="none" stroke="#da3633" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.65"/>
             
             <!-- Crosshairs -->
-            <line x1="${cx - waferRadius + 10}" y1="${cy}" x2="${cx + waferRadius - 10}" y2="${cy}" stroke="#30363d" stroke-width="1" opacity="0.5"/>
-            <line x1="${cx}" y1="${cy - waferRadius + 10}" x2="${cx}" y2="${cy + waferRadius - 10}" stroke="#30363d" stroke-width="1" opacity="0.5"/>
+            <line x1="${cx - waferRadius + 12}" y1="${cy}" x2="${cx + waferRadius - 12}" y2="${cy}" stroke="#30363d" stroke-width="1.2" opacity="0.7"/>
+            <line x1="${cx}" y1="${cy - waferRadius + 12}" x2="${cx}" y2="${cy + waferRadius - 12}" stroke="#30363d" stroke-width="1.2" opacity="0.7"/>
             
             <!-- Silicon Crystal Orientation Markers -->
-            <text x="${cx}" y="22" fill="#8b949e" font-size="9" text-anchor="middle" font-weight="600">300mm &lt;100&gt; SILICON WAFER</text>
-            <text x="${cx}" y="${cy + waferRadius - 12}" fill="#8b949e" font-size="8" text-anchor="middle">PRIMARY FLAT NOTCH</text>
-            <text x="${cx + waferRadius - 18}" y="${cy + 4}" fill="#da3633" font-size="7" font-weight="bold" text-anchor="end">3σ EDGE LIMIT</text>
+            <text x="${cx}" y="20" fill="#58a6ff" font-size="9" font-weight="700" letter-spacing="0.5" text-anchor="middle">300mm &lt;100&gt; SILICON WAFER SUBSTRATE</text>
+            <text x="${cx + waferRadius - 22}" y="${cy - 4}" fill="#da3633" font-size="8" font-weight="bold" text-anchor="end">3σ EDGE LIMIT</text>
+            <text x="${cx + 10}" y="${cy + waferRadius - 14}" fill="#8b949e" font-size="8" text-anchor="start">NOTCH [110]</text>
         `;
 
         // Render Laser Scanning Beam
         laserLayer.innerHTML = `
             <g id="radarSweepGroup" transform="translate(${cx}, ${cy})">
-                <line x1="0" y1="0" x2="${waferRadius}" y2="0" stroke="#58a6ff" stroke-width="2" filter="url(#glowEffect)" opacity="0.9"/>
+                <line x1="0" y1="0" x2="${waferRadius}" y2="0" stroke="#58a6ff" stroke-width="2.5" filter="url(#glowEffect)" opacity="0.95"/>
                 <path d="M 0 0 L ${waferRadius} 0 A ${waferRadius} ${waferRadius} 0 0 0 ${Math.cos(0.55) * waferRadius} ${-Math.sin(0.55) * waferRadius} Z" fill="url(#laserBeamGrad)" />
             </g>
         `;
@@ -636,21 +660,21 @@ function renderModuleA() {
 
         // Render Dies
         spatialDiesData.forEach((die) => {
-            const scale = (waferRadius * 0.82) / 12.0;
+            const scale = (waferRadius * 0.83) / 12.0;
             const px = cx + (die.die_x * scale);
             const py = cy + (die.die_y * scale);
 
-            let color = "#58a6ff";
-            let r = 3.5;
+            let color = "#388bfd";
+            let r = 4.0;
             if (die.status === "RE_SCREEN") {
                 color = "#bc8cff";
-                r = 4.2;
+                r = 4.8;
             } else if (die.flag_spatial || die.iddq_0h > 35) {
-                color = "#f85149";
-                r = 5.2;
+                color = "#ff4d4d";
+                r = 5.5;
             } else if (die.flag_drift || die.iddq_24h > die.iddq_0h * 1.8) {
                 color = "#f0883e";
-                r = 4.8;
+                r = 5.0;
             }
 
             const isSelected = (die.part_id === selectedAuditPart);
@@ -661,12 +685,15 @@ function renderModuleA() {
             const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
             circle.setAttribute("cx", px);
             circle.setAttribute("cy", py);
-            circle.setAttribute("r", isSelected ? (r + 3) : r);
+            circle.setAttribute("r", isSelected ? (r + 4) : r);
             circle.setAttribute("fill", color);
-            circle.setAttribute("stroke", isSelected ? "#ffffff" : (r > 4 ? "rgba(255,255,255,0.7)" : "#161b22"));
-            circle.setAttribute("stroke-width", isSelected ? "2" : "1");
+            circle.setAttribute("stroke", isSelected ? "#ffffff" : "#0d1117");
+            circle.setAttribute("stroke-width", isSelected ? "2.5" : "1.2");
+            if (isSelected) {
+                circle.setAttribute("filter", "url(#dieGlow)");
+            }
             circle.setAttribute("id", `die_${die.part_id}`);
-            circle.setAttribute("class", "interactive-die");
+            circle.setAttribute("class", "interactive-die" + (isSelected ? " selected-die" : ""));
             circle.style.cursor = "pointer";
             circle.style.transition = "r 0.15s ease, stroke 0.15s ease";
 
@@ -677,52 +704,73 @@ function renderModuleA() {
             diesLayer.appendChild(circle);
         });
 
-        // If a die is selected, draw a glowing targeting reticle
+        // If a die is selected, draw a prominent targeting HUD reticle
         if (selectedDieCoords) {
+            const die = selectedDieCoords.die;
+            const px = selectedDieCoords.px;
+            const py = selectedDieCoords.py;
             hudLayer.innerHTML = `
-                <circle cx="${selectedDieCoords.px}" cy="${selectedDieCoords.py}" r="11" fill="none" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="3 3"/>
-                <circle cx="${selectedDieCoords.px}" cy="${selectedDieCoords.py}" r="16" fill="none" stroke="rgba(88, 166, 255, 0.4)" stroke-width="1"/>
-                <line x1="${selectedDieCoords.px - 14}" y1="${selectedDieCoords.py}" x2="${selectedDieCoords.px - 6}" y2="${selectedDieCoords.py}" stroke="#58a6ff" stroke-width="1.5"/>
-                <line x1="${selectedDieCoords.px + 6}" y1="${selectedDieCoords.py}" x2="${selectedDieCoords.px + 14}" y2="${selectedDieCoords.py}" stroke="#58a6ff" stroke-width="1.5"/>
-                <line x1="${selectedDieCoords.px}" y1="${selectedDieCoords.py - 14}" x2="${selectedDieCoords.px}" y2="${selectedDieCoords.py - 6}" stroke="#58a6ff" stroke-width="1.5"/>
-                <line x1="${selectedDieCoords.px}" y1="${selectedDieCoords.py + 6}" x2="${selectedDieCoords.px}" y2="${selectedDieCoords.py + 14}" stroke="#58a6ff" stroke-width="1.5"/>
-                <text x="${selectedDieCoords.px}" y="${selectedDieCoords.py - 18}" fill="#58a6ff" font-size="9" font-weight="bold" text-anchor="middle">${selectedAuditPart}</text>
+                <!-- Outer Reticle Circles -->
+                <circle cx="${px}" cy="${py}" r="14" fill="none" stroke="#58a6ff" stroke-width="1.8" stroke-dasharray="3 3"/>
+                <circle cx="${px}" cy="${py}" r="20" fill="none" stroke="rgba(88, 166, 255, 0.4)" stroke-width="1"/>
+                
+                <!-- Crosshairs -->
+                <line x1="${px - 18}" y1="${py}" x2="${px - 8}" y2="${py}" stroke="#58a6ff" stroke-width="2"/>
+                <line x1="${px + 8}" y1="${py}" x2="${px + 18}" y2="${py}" stroke="#58a6ff" stroke-width="2"/>
+                <line x1="${px}" y1="${py - 18}" x2="${px}" y2="${py - 8}" stroke="#58a6ff" stroke-width="2"/>
+                <line x1="${px}" y1="${py + 8}" x2="${px}" y2="${py + 18}" stroke="#58a6ff" stroke-width="2"/>
+                
+                <!-- Callout Data Tag -->
+                <g transform="translate(${px}, ${Math.max(25, py - 26)})">
+                    <rect x="-55" y="-12" width="110" height="20" rx="4" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+                    <text x="0" y="2" fill="#ffffff" font-size="9" font-weight="700" font-family="monospace" text-anchor="middle">
+                        ${selectedAuditPart} | ${die.iddq_0h || 11.0}µA
+                    </text>
+                </g>
             `;
         }
 
     } else {
-        // Scatter Plot View (Iddq vs Spatial Channel)
+        // High-Definition Scatter Plot View (Iddq Current vs Die Spatial Channel)
         baseLayer.innerHTML = `
-            <line x1="60" y1="35" x2="450" y2="35" stroke="#30363d" stroke-dasharray="2 4" stroke-width="1"/>
-            <line x1="60" y1="90" x2="450" y2="90" stroke="#30363d" stroke-dasharray="2 4" stroke-width="1"/>
-            <line x1="60" y1="145" x2="450" y2="145" stroke="#30363d" stroke-dasharray="2 4" stroke-width="1"/>
-            <line x1="60" y1="200" x2="450" y2="200" stroke="#8b949e" stroke-width="1.5"/>
-            <line x1="60" y1="20" x2="60" y2="200" stroke="#8b949e" stroke-width="1.5"/>
+            <!-- Shaded Threshold Corridor Bands -->
+            <rect x="70" y="150" width="440" height="70" fill="rgba(35, 134, 54, 0.08)" stroke="none"/>
+            <rect x="70" y="90" width="440" height="60" fill="rgba(240, 136, 62, 0.08)" stroke="none"/>
+            <rect x="70" y="25" width="440" height="65" fill="rgba(218, 54, 51, 0.12)" stroke="none"/>
 
-            <text transform="rotate(-90)" x="-110" y="18" fill="#8b949e" font-size="10" font-weight="600" text-anchor="middle">Iddq Current (µA)</text>
-            <text x="52" y="39" fill="#8b949e" font-size="9" text-anchor="end">60 µA</text>
-            <text x="52" y="94" fill="#8b949e" font-size="9" text-anchor="end">40 µA</text>
-            <text x="52" y="149" fill="#8b949e" font-size="9" text-anchor="end">20 µA</text>
-            <text x="52" y="204" fill="#8b949e" font-size="9" text-anchor="end">0 µA</text>
+            <!-- Grid Lines -->
+            <line x1="70" y1="40" x2="510" y2="40" stroke="#30363d" stroke-dasharray="2 4" stroke-width="1"/>
+            <line x1="70" y1="85" x2="510" y2="85" stroke="#30363d" stroke-dasharray="2 4" stroke-width="1"/>
+            <line x1="70" y1="130" x2="510" y2="130" stroke="#30363d" stroke-dasharray="2 4" stroke-width="1"/>
+            <line x1="70" y1="175" x2="510" y2="175" stroke="#30363d" stroke-dasharray="2 4" stroke-width="1"/>
+            <line x1="70" y1="220" x2="510" y2="220" stroke="#8b949e" stroke-width="1.5"/>
+            <line x1="70" y1="25" x2="70" y2="220" stroke="#8b949e" stroke-width="1.5"/>
 
-            <text x="255" y="235" fill="#8b949e" font-size="11" font-weight="600" text-anchor="middle">Spatial Die Channel / Index</text>
+            <text transform="rotate(-90)" x="-120" y="22" fill="#8b949e" font-size="10" font-weight="600" text-anchor="middle">Parametric Leakage Iddq (µA)</text>
+            <text x="62" y="44" fill="#8b949e" font-size="9" text-anchor="end">60 µA</text>
+            <text x="62" y="89" fill="#8b949e" font-size="9" text-anchor="end">45 µA</text>
+            <text x="62" y="134" fill="#8b949e" font-size="9" text-anchor="end">30 µA</text>
+            <text x="62" y="179" fill="#8b949e" font-size="9" text-anchor="end">15 µA</text>
+            <text x="62" y="224" fill="#8b949e" font-size="9" text-anchor="end">0 µA</text>
+
+            <text x="290" y="252" fill="#8b949e" font-size="11" font-weight="600" text-anchor="middle">Spatial Die Channel / Index (0 to 60)</text>
             
             <!-- Outlier Limit Line -->
-            <line x1="60" y1="75" x2="450" y2="75" stroke="#da3633" stroke-width="1.5" stroke-dasharray="4"/>
-            <text x="445" y="68" fill="#da3633" font-size="9" font-weight="bold" text-anchor="end">Spatial 3σ Limit (45 µA)</text>
+            <line x1="70" y1="85" x2="510" y2="85" stroke="#da3633" stroke-width="1.8" stroke-dasharray="5 3"/>
+            <text x="505" y="78" fill="#da3633" font-size="9" font-weight="bold" text-anchor="end">Spatial 3σ Limit (45 µA)</text>
         `;
 
         let selectedScatterPoint = null;
 
         spatialDiesData.forEach((die, index) => {
-            const px = 60 + ((index % 60) / 60) * 380;
-            const py = 200 - Math.min(180, (die.iddq_0h / 65) * 180);
+            const px = 70 + ((index % 60) / 60) * 430;
+            const py = 220 - Math.min(195, (die.iddq_0h / 60) * 180);
 
-            let color = "#58a6ff";
-            let r = 3.5;
+            let color = "#388bfd";
+            let r = 4.0;
             if (die.status === "RE_SCREEN") color = "#bc8cff";
-            else if (die.flag_spatial || die.iddq_0h > 35) { color = "#f85149"; r = 5.5; }
-            else if (die.flag_drift) { color = "#f0883e"; r = 4.5; }
+            else if (die.flag_spatial || die.iddq_0h > 35) { color = "#ff4d4d"; r = 5.8; }
+            else if (die.flag_drift) { color = "#f0883e"; r = 4.8; }
 
             const isSelected = (die.part_id === selectedAuditPart);
             if (isSelected) {
@@ -732,10 +780,10 @@ function renderModuleA() {
             const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
             circle.setAttribute("cx", px);
             circle.setAttribute("cy", py);
-            circle.setAttribute("r", isSelected ? (r + 3) : r);
+            circle.setAttribute("r", isSelected ? (r + 4) : r);
             circle.setAttribute("fill", color);
-            circle.setAttribute("stroke", isSelected ? "#ffffff" : "#161b22");
-            circle.setAttribute("stroke-width", isSelected ? "2" : "1");
+            circle.setAttribute("stroke", isSelected ? "#ffffff" : "#0d1117");
+            circle.setAttribute("stroke-width", isSelected ? "2.5" : "1.2");
             circle.style.cursor = "pointer";
 
             circle.onmouseenter = (e) => showDieTooltip(e, die, px, py);
@@ -747,11 +795,17 @@ function renderModuleA() {
 
         if (selectedScatterPoint) {
             hudLayer.innerHTML = `
-                <line x1="${selectedScatterPoint.px}" y1="20" x2="${selectedScatterPoint.px}" y2="200" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="2 3"/>
-                <circle cx="${selectedScatterPoint.px}" cy="${selectedScatterPoint.py}" r="10" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
-                <text x="${selectedScatterPoint.px}" y="${Math.max(30, selectedScatterPoint.py - 14)}" fill="#58a6ff" font-size="9" font-weight="bold" text-anchor="middle">
-                    ${selectedAuditPart} (${selectedScatterPoint.die.iddq_0h} µA)
-                </text>
+                <!-- Drop Projection Line -->
+                <line x1="${selectedScatterPoint.px}" y1="25" x2="${selectedScatterPoint.px}" y2="220" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="3 3"/>
+                <circle cx="${selectedScatterPoint.px}" cy="${selectedScatterPoint.py}" r="12" fill="none" stroke="#58a6ff" stroke-width="2"/>
+                <circle cx="${selectedScatterPoint.px}" cy="${selectedScatterPoint.py}" r="17" fill="none" stroke="rgba(88, 166, 255, 0.4)" stroke-width="1"/>
+                
+                <g transform="translate(${selectedScatterPoint.px}, ${Math.max(25, selectedScatterPoint.py - 18)})">
+                    <rect x="-60" y="-12" width="120" height="18" rx="4" fill="#161b22" stroke="#58a6ff" stroke-width="1.2"/>
+                    <text x="0" y="1" fill="#ffffff" font-size="9" font-weight="bold" font-family="monospace" text-anchor="middle">
+                        ${selectedAuditPart}: ${selectedScatterPoint.die.iddq_0h} µA
+                    </text>
+                </g>
             `;
         }
     }
@@ -760,7 +814,7 @@ function renderModuleA() {
 function updateRadarSweepPosition() {
     const sweep = document.getElementById("radarSweepGroup");
     if (sweep) {
-        sweep.setAttribute("transform", `translate(240, 130) rotate(${radarAngle})`);
+        sweep.setAttribute("transform", `translate(270, 140) rotate(${radarAngle})`);
     }
 
     const readout = document.getElementById("waferScanReadout");
@@ -822,7 +876,14 @@ async function loadDriftSeriesData() {
     };
 
     let selH0 = 11.0, selH24 = 24.5, selH96 = 32.0, selH168 = 39.0;
-    if (selectedAuditPart === "PART_088") {
+    const dieMatch = spatialDiesData.find(d => d.part_id === selectedAuditPart) || 
+                     clientTelemetryRecords.find(r => r.part_id === selectedAuditPart && r.vehicle_type === currentVehicle);
+    if (dieMatch) {
+        selH0 = Number(dieMatch.iddq_0h || dieMatch.iddq_0h_uA || 11.0);
+        selH24 = Number(dieMatch.iddq_24h || dieMatch.iddq_24h_uA || (selH0 * 1.2));
+        selH168 = Number(dieMatch.iddq_168h || dieMatch.forecast_iddq_168h_uA || (selH24 * 1.15));
+        selH96 = Number((selH24 + (selH168 - selH24) * 0.55).toFixed(2));
+    } else if (selectedAuditPart === "PART_088") {
         selH0 = 10.2; selH24 = 19.5; selH96 = 11.2; selH168 = 11.0;
     } else if (selectedAuditPart === "PART_010") {
         selH0 = 48.0; selH24 = 50.2; selH96 = 51.4; selH168 = 52.0;
@@ -1313,21 +1374,108 @@ function nextPage() {
 }
 
 // ==========================================
-// DEEP AUDIT & TREESHAP INSPECTION
+// DEEP AUDIT, COMPONENT SPOTLIGHT & TREESHAP INSPECTION
 // ==========================================
+let currentSpotlightFilter = "ALL";
+
+function populateComponentDropdowns(targetPartId) {
+    const globalSel = document.getElementById("globalPartSelect");
+    const panelSel = document.getElementById("partSelect");
+    
+    // Gather all unique part records for the current vehicle
+    let records = clientTelemetryRecords.filter(r => r.vehicle_type === currentVehicle);
+    if (records.length === 0) {
+        // Fallback to synthetic dies if telemetry records not yet loaded
+        records = spatialDiesData.map(d => ({
+            part_id: d.part_id,
+            status: d.status,
+            anomaly_category: d.status === "CLEARED" ? "NOMINAL" : (d.flag_drift ? "THERMAL_DRIFT" : (d.status === "RE_SCREEN" ? "ATMOSPHERIC_NOISE" : "SPATIAL_OUTLIER")),
+            sensing_channel: `Channel ${d.die_x},${d.die_y}`,
+            failure_factor: d.status === "CLEARED" ? "Nominal Silicon Baseline" : "Burn-in Parametric Shift"
+        }));
+    }
+
+    // Apply spotlight filter if active
+    let filtered = records;
+    if (currentSpotlightFilter === "CLEARED") {
+        filtered = records.filter(r => r.status === "CLEARED");
+    } else if (currentSpotlightFilter === "REJECT") {
+        filtered = records.filter(r => r.status === "REJECT" || r.anomaly_category === "SPATIAL_OUTLIER" || r.anomaly_category === "THERMAL_DRIFT");
+    } else if (currentSpotlightFilter === "ATMOSPHERIC") {
+        filtered = records.filter(r => r.status === "RE_SCREEN" || r.anomaly_category === "ATMOSPHERIC_NOISE");
+    }
+
+    const currentSelected = targetPartId || selectedAuditPart;
+
+    if (globalSel) {
+        globalSel.innerHTML = "";
+        filtered.forEach(r => {
+            const opt = document.createElement("option");
+            opt.value = r.part_id;
+            opt.innerText = `${r.part_id} — [${r.status}] ${r.sensing_channel || ''}`;
+            if (r.part_id === currentSelected) opt.selected = true;
+            globalSel.appendChild(opt);
+        });
+    }
+
+    if (panelSel) {
+        panelSel.innerHTML = "";
+        records.forEach(r => {
+            const opt = document.createElement("option");
+            opt.value = r.part_id;
+            const factorSnippet = r.failure_factor ? r.failure_factor.substring(0, 32) : 'Nominal';
+            opt.innerText = `${r.part_id} (${factorSnippet}...)`;
+            if (r.part_id === currentSelected) opt.selected = true;
+            panelSel.appendChild(opt);
+        });
+    }
+}
+
+function filterSpotlightList(filterType, btnElem) {
+    currentSpotlightFilter = filterType;
+    const filterBtns = document.querySelectorAll(".spotlight-filter-btn");
+    filterBtns.forEach(btn => btn.classList.remove("active"));
+    if (btnElem) btnElem.classList.add("active");
+
+    populateComponentDropdowns();
+    
+    // If the currently selected part is not in the filtered list, select the first available item
+    const globalSel = document.getElementById("globalPartSelect");
+    if (globalSel && globalSel.options.length > 0) {
+        let isPresent = false;
+        for (let opt of globalSel.options) {
+            if (opt.value === selectedAuditPart) {
+                isPresent = true;
+                break;
+            }
+        }
+        if (!isPresent && globalSel.options[0]) {
+            selectPartForInspection(globalSel.options[0].value);
+        }
+    }
+}
+
+function stepComponent(direction) {
+    const globalSel = document.getElementById("globalPartSelect");
+    if (!globalSel || globalSel.options.length === 0) return;
+
+    let currentIndex = globalSel.selectedIndex;
+    if (currentIndex === -1) currentIndex = 0;
+
+    let nextIndex = currentIndex + direction;
+    if (nextIndex < 0) nextIndex = globalSel.options.length - 1;
+    if (nextIndex >= globalSel.options.length) nextIndex = 0;
+
+    globalSel.selectedIndex = nextIndex;
+    selectPartForInspection(globalSel.options[nextIndex].value);
+}
+
 async function loadInspectionOptions() {
     try {
         const res = await fetch(`/api/diagnostics/inspections?vehicle=${currentVehicle}`);
         if (res.ok) {
             const data = await res.json();
-            const sel = document.getElementById("partSelect");
-            sel.innerHTML = "";
-            data.forEach(item => {
-                const opt = document.createElement("option");
-                opt.value = item.part_id;
-                opt.innerText = `${item.part_id} (${item.factor.substring(0, 38)}...)`;
-                sel.appendChild(opt);
-            });
+            populateComponentDropdowns(selectedAuditPart);
             updateAuditCard();
             return;
         }
@@ -1335,42 +1483,75 @@ async function loadInspectionOptions() {
         isStaticMode = true;
     }
 
-    const sel = document.getElementById("partSelect");
-    sel.innerHTML = "";
-    Object.keys(FALLBACK_INSPECTIONS).forEach(partId => {
-        const item = FALLBACK_INSPECTIONS[partId];
-        const opt = document.createElement("option");
-        opt.value = partId;
-        opt.innerText = `${partId} (${item.factor.substring(0, 38)}...)`;
-        sel.appendChild(opt);
-    });
+    populateComponentDropdowns(selectedAuditPart);
     updateAuditCard();
 }
 
 function selectPartForInspection(partId) {
     selectedAuditPart = partId;
-    const sel = document.getElementById("partSelect");
-    let found = false;
-    for (let opt of sel.options) {
-        if (opt.value === partId) {
+
+    // 1. Sync Spotlight Bar Select
+    const globalSel = document.getElementById("globalPartSelect");
+    if (globalSel) {
+        let found = false;
+        for (let opt of globalSel.options) {
+            if (opt.value === partId) {
+                opt.selected = true;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            const opt = document.createElement("option");
+            opt.value = partId;
+            opt.innerText = `${partId} — Selected Component`;
+            globalSel.prepend(opt);
             opt.selected = true;
-            found = true;
-            break;
         }
     }
-    if (!found) {
-        const newOpt = document.createElement("option");
-        newOpt.value = partId;
-        newOpt.innerText = `${partId} (Selected from telemetry)`;
-        sel.prepend(newOpt);
-        newOpt.selected = true;
+
+    // 2. Sync Diagnostics Panel Select
+    const panelSel = document.getElementById("partSelect");
+    if (panelSel) {
+        let found = false;
+        for (let opt of panelSel.options) {
+            if (opt.value === partId) {
+                opt.selected = true;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            const opt = document.createElement("option");
+            opt.value = partId;
+            opt.innerText = `${partId} (Selected from telemetry)`;
+            panelSel.prepend(opt);
+            opt.selected = true;
+        }
     }
 
+    // 3. Update Badges across all panels simultaneously
+    const waferBadge = document.getElementById("waferPartBadge");
+    if (waferBadge) waferBadge.innerText = `Active: ${partId}`;
+
+    const oscBadge = document.getElementById("oscPartBadge");
+    if (oscBadge) oscBadge.innerText = `Active: ${partId} (${driftViewMode === 'fleet' ? 'Fleet Overlay' : 'Precision Oscilloscope'})`;
+
+    const spotlightPill = document.getElementById("spotlightStatusPill");
+    if (spotlightPill) {
+        const record = clientTelemetryRecords.find(r => r.part_id === partId && r.vehicle_type === currentVehicle) ||
+                       spatialDiesData.find(d => d.part_id === partId);
+        const status = record ? (record.status || "QUALIFIED") : "QUALIFIED";
+        spotlightPill.innerText = `${partId} — ${status}`;
+        spotlightPill.className = "spotlight-pill " + (status === "CLEARED" || status === "QUALIFIED" ? "pill-cleared" : (status === "RE_SCREEN" ? "pill-weather" : "pill-reject"));
+    }
+
+    // 4. Update Synchronized Visual Modules & Diagnostics
     updateAuditCard();
     loadDriftSeriesData();
-    renderModuleA(); // Refresh selected die reticle in Module A
+    renderModuleA();
     
-    // Highlight selected row in table
+    // 5. Highlight selected row in telemetry table
     const rows = document.querySelectorAll("#tableBody tr");
     rows.forEach(row => {
         const firstCell = row.querySelector("td b");
@@ -1381,11 +1562,11 @@ function selectPartForInspection(partId) {
         }
     });
 
-    showToast(`Loaded Diagnostic Audit & Trajectory for ${partId}`);
+    showToast(`Inspecting Component ${partId} across Modules A, B & Ground Station`);
 }
 
 async function updateAuditCard() {
-    const selected = document.getElementById("partSelect").value;
+    const selected = selectedAuditPart || (document.getElementById("partSelect") ? document.getElementById("partSelect").value : "PART_088");
     selectedAuditPart = selected;
 
     try {
@@ -1393,37 +1574,47 @@ async function updateAuditCard() {
         if (res.ok) {
             const data = await res.json();
             applyAuditCardData(data);
-            loadDriftSeriesData();
             return;
         }
     } catch (err) {
         isStaticMode = true;
     }
 
+    // Dynamic fallback generation based on part telemetry record
+    const record = clientTelemetryRecords.find(r => r.part_id === selected && r.vehicle_type === currentVehicle) ||
+                   spatialDiesData.find(d => d.part_id === selected);
+
+    let h0 = 11.2, h24 = 19.5, h168 = 24.8, maxLim = 45.0;
+    if (record) {
+        h0 = Number(record.iddq_0h || record.iddq_0h_uA || 11.2);
+        h24 = Number(record.iddq_24h || record.iddq_24h_uA || 19.5);
+        h168 = Number(record.iddq_168h || record.forecast_iddq_168h_uA || 24.8);
+    }
+    const maxVal = Math.max(h0, h24, h168);
+    const leakagePct = Math.min(100, Math.round((maxVal / maxLim) * 100));
+
     const fallback = FALLBACK_INSPECTIONS[selected] || {
-        status_text: "STATUS: NOMINAL (SPACE QUALIFIED)",
-        status_color: "#3fb950",
-        category: "Nominal Flight Telemetry",
-        sensor: "Avionics Multi-channel Bus",
-        factor: "All burn-in and spatial parameters within baseline limits",
-        drift_text: "12.00 µA (Safe for launch integration)",
-        drift_color: "#3fb950",
-        bar1_label: "Baseline Silicon Purity (90% Impact)",
-        bar1_val: "88%",
-        bar1_color: "var(--accent-green)",
-        bar2_label: "Channel Impedance Stability (85% Impact)",
-        bar2_val: "82%",
-        bar2_color: "var(--accent-blue)",
+        status_text: (record && record.status === "REJECT") ? "STATUS: REJECT / DISQUALIFIED" : ((record && record.status === "RE_SCREEN") ? "STATUS: RE-SCREEN (ATMOSPHERIC TRANSIENT)" : "STATUS: NOMINAL (SPACE QUALIFIED)"),
+        status_color: (record && record.status === "REJECT") ? "#da3633" : ((record && record.status === "RE_SCREEN") ? "#bc8cff" : "#3fb950"),
+        category: record ? record.anomaly_category : "Nominal Flight Telemetry",
+        sensor: record ? record.sensing_channel : "Avionics Multi-channel Bus",
+        factor: record ? record.failure_factor : "All burn-in and spatial parameters within baseline limits",
+        drift_text: `${h168.toFixed(2)} µA (Verified against launch limits)`,
+        drift_color: (h168 > maxLim) ? "#da3633" : ((h168 > 25.0) ? "#f0883e" : "#3fb950"),
+        iddq_0h: h0,
+        iddq_24h: h24,
+        iddq_168h: h168,
+        max_limit: maxLim,
+        leakage_pct: leakagePct,
         factor_weights: [
-            { feature: "Baseline Silicon Purity", impact_pct: 54, color: "var(--accent-green)" },
-            { feature: "Channel Impedance Stability", impact_pct: 32, color: "var(--accent-green)" },
-            { feature: "Burn-in Thermal Gradient", impact_pct: 12, color: "var(--accent-blue)" },
-            { feature: "Ground Station EMI Noise", impact_pct: -8, color: "var(--accent-cyan)" }
+            { feature: "Baseline Silicon Purity", impact_pct: 54, color: "var(--accent-green)", description: "Crystal lattice uniformity across central 300mm wafer zone" },
+            { feature: "Channel Impedance Stability", impact_pct: 32, color: "var(--accent-green)", description: "Differential impedance margin under thermal burn-in stress" },
+            { feature: "Burn-in Thermal Gradient", impact_pct: (h24 > h0 * 1.5 ? 28 : 12), color: "var(--accent-blue)", description: "Junction temperature dissipation coefficient during 24h bake" },
+            { feature: "Ground Station EMI Noise", impact_pct: (selected === "PART_088" ? -35 : -8), color: "var(--accent-cyan)", description: "Atmospheric coupling & launch pad umbilical noise attenuation" }
         ]
     };
     fallback.part_id = selected;
     applyAuditCardData(fallback);
-    loadDriftSeriesData();
 }
 
 function renderTreeSHAP(weights) {
@@ -1432,10 +1623,10 @@ function renderTreeSHAP(weights) {
     container.innerHTML = "";
 
     const list = (weights && weights.length > 0) ? weights : [
-        { feature: "Baseline Silicon Purity", impact_pct: 50, color: "var(--accent-green)" },
-        { feature: "Thermal Dissipation Margin", impact_pct: 28, color: "var(--accent-green)" },
-        { feature: "Atmospheric Noise Rejection", impact_pct: 16, color: "var(--accent-blue)" },
-        { feature: "Ground Station EMI Exposure", impact_pct: -12, color: "var(--accent-cyan)" }
+        { feature: "Baseline Silicon Purity", impact_pct: 50, color: "var(--accent-green)", description: "Crystal lattice integrity and spatial homogeneity" },
+        { feature: "Thermal Dissipation Margin", impact_pct: 28, color: "var(--accent-green)", description: "Thermal conductivity across avionics chassis" },
+        { feature: "Atmospheric Noise Rejection", impact_pct: 16, color: "var(--accent-blue)", description: "High-frequency RF transient rejection" },
+        { feature: "Ground Station EMI Exposure", impact_pct: -12, color: "var(--accent-cyan)", description: "Ground pad umbilical cable electromagnetic coupling" }
     ];
 
     list.forEach(item => {
@@ -1452,8 +1643,9 @@ function renderTreeSHAP(weights) {
                 <span class="treeshap-badge ${badgeClass}">${sign}${absVal}% Impact</span>
             </div>
             <div class="treeshap-bar-bg">
-                <div class="treeshap-bar-fill" style="width: 0%; background-color: ${item.color || 'var(--accent-blue)'};"></div>
+                <div class="treeshap-bar-fill" style="width: 0%; background-color: ${item.color || (isNeg ? 'var(--accent-cyan)' : 'var(--accent-green)')};"></div>
             </div>
+            ${item.description ? `<div class="treeshap-desc" style="font-size:10px; color:var(--text-muted); margin-top:2px;">${item.description}</div>` : ''}
         `;
         container.appendChild(row);
 
@@ -1466,29 +1658,90 @@ function renderTreeSHAP(weights) {
 }
 
 function applyAuditCardData(data) {
-    document.getElementById("auditStatus").innerText = data.status_text;
-    document.getElementById("auditStatus").style.color = data.status_color;
-    document.getElementById("auditPartId").innerText = data.part_id || document.getElementById("partSelect").value;
-    document.getElementById("auditCategory").innerText = data.category;
-    document.getElementById("auditCategory").style.color = data.status_color;
-    document.getElementById("auditSensor").innerText = data.sensor;
-    document.getElementById("auditFactor").innerText = data.factor;
-    document.getElementById("auditDrift").innerText = data.drift_text;
-    document.getElementById("auditDrift").style.color = data.drift_color;
-
-    if (document.getElementById("bar1Label")) document.getElementById("bar1Label").innerText = data.bar1_label || "Primary Attribute";
-    if (document.getElementById("bar1")) {
-        document.getElementById("bar1").style.width = data.bar1_val || "50%";
-        document.getElementById("bar1").style.backgroundColor = data.bar1_color || "var(--accent-green)";
+    const statusElem = document.getElementById("auditStatus");
+    if (statusElem) {
+        statusElem.innerText = data.status_text || "STATUS: NOMINAL";
+        statusElem.style.color = data.status_color || "#3fb950";
     }
 
-    if (document.getElementById("bar2Label")) document.getElementById("bar2Label").innerText = data.bar2_label || "Secondary Attribute";
-    if (document.getElementById("bar2")) {
-        document.getElementById("bar2").style.width = data.bar2_val || "50%";
-        document.getElementById("bar2").style.backgroundColor = data.bar2_color || "var(--accent-blue)";
+    const partIdElem = document.getElementById("auditPartId");
+    if (partIdElem) partIdElem.innerText = data.part_id || selectedAuditPart;
+
+    const catElem = document.getElementById("auditCategory");
+    if (catElem) {
+        catElem.innerText = data.category || "Nominal Flight Telemetry";
+        catElem.style.color = data.status_color || "#3fb950";
     }
 
-    // Render TreeSHAP Factor Weights
+    const sensElem = document.getElementById("auditSensor");
+    if (sensElem) sensElem.innerText = data.sensor || "Avionics Multi-channel Bus";
+
+    const factElem = document.getElementById("auditFactor");
+    if (factElem) factElem.innerText = data.factor || "All parameters nominal";
+
+    const driftElem = document.getElementById("auditDrift");
+    if (driftElem) {
+        driftElem.innerText = data.drift_text || "Nominal";
+        driftElem.style.color = data.drift_color || "#3fb950";
+    }
+
+    // ==========================================
+    // UPDATE GROUND STATION LEAKAGE GAUGE
+    // ==========================================
+    const h0 = Number(data.iddq_0h || 11.2);
+    const h24 = Number(data.iddq_24h || 19.5);
+    const h168 = Number(data.iddq_168h || 24.8);
+    const maxLimit = Number(data.max_limit || 45.0);
+    const leakagePct = Number(data.leakage_pct || Math.min(100, Math.round((Math.max(h0, h24, h168) / maxLimit) * 100)));
+
+    const p0 = document.getElementById("leakagePhase0h");
+    if (p0) p0.innerText = `${h0.toFixed(2)} µA`;
+
+    const p24 = document.getElementById("leakagePhase24h");
+    if (p24) p24.innerText = `${h24.toFixed(2)} µA`;
+
+    const p168 = document.getElementById("leakagePhase168h");
+    if (p168) p168.innerText = `${h168.toFixed(2)} µA`;
+
+    const pCap = document.getElementById("leakagePhaseCap");
+    if (pCap) pCap.innerText = `Limit: ${maxLimit.toFixed(1)} µA`;
+
+    const pPeak = document.getElementById("leakagePeakVal");
+    if (pPeak) pPeak.innerText = `Peak: ${Math.max(h0, h24, h168).toFixed(2)} µA`;
+
+    const pLimit = document.getElementById("leakageLimitVal");
+    if (pLimit) pLimit.innerText = `Limit: ${maxLimit.toFixed(1)} µA`;
+
+    const pPct = document.getElementById("leakagePctVal");
+    if (pPct) pPct.innerText = `${leakagePct}%`;
+
+    const pBar = document.getElementById("leakageProgressBar");
+    if (pBar) {
+        pBar.style.width = `${leakagePct}%`;
+        if (leakagePct >= 90) {
+            pBar.style.backgroundColor = "#da3633"; // Critical Red
+        } else if (leakagePct >= 65) {
+            pBar.style.backgroundColor = "#f0883e"; // Caution Amber
+        } else {
+            pBar.style.backgroundColor = "#238636"; // Nominal Green
+        }
+    }
+
+    const badge = document.getElementById("leakageStatusBadge");
+    if (badge) {
+        if (leakagePct >= 90) {
+            badge.innerText = "CRITICAL EXCEEDANCE";
+            badge.className = "leakage-status-badge badge-critical";
+        } else if (leakagePct >= 65) {
+            badge.innerText = "MARGINAL / ELEVATED";
+            badge.className = "leakage-status-badge badge-warning";
+        } else {
+            badge.innerText = "SAFE / PASS";
+            badge.className = "leakage-status-badge badge-safe";
+        }
+    }
+
+    // Render TreeSHAP Factor Weights with EMI Coupling details
     renderTreeSHAP(data.factor_weights);
 }
 
