@@ -11,6 +11,7 @@ let isStaticMode = false;
 
 // Visualization & Animation State
 let waferViewMode = "wafer"; // "wafer" or "scatter"
+let driftViewMode = "fleet"; // "fleet" or "precision"
 let isRadarEnabled = true;
 let isOscEnabled = true;
 let playbackSpeed = 1.0;
@@ -458,6 +459,18 @@ function updateVehicleView() {
     document.getElementById("metricWeather").innerText = data.weather;
     document.getElementById("metricLot").innerText = data.lot_id;
     document.getElementById("topologyVehicleLabel").innerText = `${data.name || currentVehicle} Multi-Stage Bus`;
+
+    // Synchronize Environmental & Ground Station HUD
+    const envLot = document.getElementById("envLotId");
+    if (envLot) envLot.innerText = `${currentVehicle}_STAGE_02`;
+    const envMax = document.getElementById("envMaxIddq");
+    if (envMax) envMax.innerText = data.max_iddq || "55.0 µA";
+    const envWind = document.getElementById("envWindShear");
+    if (envWind) envWind.innerText = data.wind_shear || "45 knots";
+    const envEmi = document.getElementById("envEmiLimit");
+    if (envEmi) envEmi.innerText = data.emi_limit || "-80 dB";
+    const envAtmos = document.getElementById("envAtmosphericCount");
+    if (envAtmos) envAtmos.innerText = `${data.weather || 12} Spikes`;
 }
 
 // ==========================================
@@ -489,10 +502,22 @@ function cyclePlaybackSpeed() {
 
 function setWaferViewMode(mode) {
     waferViewMode = mode;
-    document.getElementById("btnViewWafer").classList.toggle("active", mode === "wafer");
-    document.getElementById("btnViewScatter").classList.toggle("active", mode === "scatter");
+    const btnW = document.getElementById("btnViewWafer");
+    const btnS = document.getElementById("btnViewScatter");
+    if (btnW) btnW.classList.toggle("active", mode === "wafer");
+    if (btnS) btnS.classList.toggle("active", mode === "scatter");
     renderModuleA();
-    showToast(`Switched Module A to ${mode === 'wafer' ? 'Silicon Wafer Disc' : 'Scatter Grid'}`);
+    showToast(`Switched Module A to ${mode === 'wafer' ? '300mm Silicon Wafer Disc' : 'Channel Scatter Grid'}`);
+}
+
+function setDriftViewMode(mode) {
+    driftViewMode = mode;
+    const btnF = document.getElementById("btnViewFleet");
+    const btnP = document.getElementById("btnViewPrecision");
+    if (btnF) btnF.classList.toggle("active", mode === "fleet");
+    if (btnP) btnP.classList.toggle("active", mode === "precision");
+    renderModuleB();
+    showToast(`Switched Module B to ${mode === 'fleet' ? 'Fleet Trajectory Overlay' : 'Precision Oscilloscope Mode'}`);
 }
 
 function startAnimationLoop() {
@@ -607,8 +632,10 @@ function renderModuleA() {
             </g>
         `;
 
+        let selectedDieCoords = null;
+
         // Render Dies
-        spatialDiesData.forEach((die, index) => {
+        spatialDiesData.forEach((die) => {
             const scale = (waferRadius * 0.82) / 12.0;
             const px = cx + (die.die_x * scale);
             const py = cy + (die.die_y * scale);
@@ -627,6 +654,10 @@ function renderModuleA() {
             }
 
             const isSelected = (die.part_id === selectedAuditPart);
+            if (isSelected) {
+                selectedDieCoords = { px, py, die };
+            }
+
             const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
             circle.setAttribute("cx", px);
             circle.setAttribute("cy", py);
@@ -645,6 +676,19 @@ function renderModuleA() {
 
             diesLayer.appendChild(circle);
         });
+
+        // If a die is selected, draw a glowing targeting reticle
+        if (selectedDieCoords) {
+            hudLayer.innerHTML = `
+                <circle cx="${selectedDieCoords.px}" cy="${selectedDieCoords.py}" r="11" fill="none" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="3 3"/>
+                <circle cx="${selectedDieCoords.px}" cy="${selectedDieCoords.py}" r="16" fill="none" stroke="rgba(88, 166, 255, 0.4)" stroke-width="1"/>
+                <line x1="${selectedDieCoords.px - 14}" y1="${selectedDieCoords.py}" x2="${selectedDieCoords.px - 6}" y2="${selectedDieCoords.py}" stroke="#58a6ff" stroke-width="1.5"/>
+                <line x1="${selectedDieCoords.px + 6}" y1="${selectedDieCoords.py}" x2="${selectedDieCoords.px + 14}" y2="${selectedDieCoords.py}" stroke="#58a6ff" stroke-width="1.5"/>
+                <line x1="${selectedDieCoords.px}" y1="${selectedDieCoords.py - 14}" x2="${selectedDieCoords.px}" y2="${selectedDieCoords.py - 6}" stroke="#58a6ff" stroke-width="1.5"/>
+                <line x1="${selectedDieCoords.px}" y1="${selectedDieCoords.py + 6}" x2="${selectedDieCoords.px}" y2="${selectedDieCoords.py + 14}" stroke="#58a6ff" stroke-width="1.5"/>
+                <text x="${selectedDieCoords.px}" y="${selectedDieCoords.py - 18}" fill="#58a6ff" font-size="9" font-weight="bold" text-anchor="middle">${selectedAuditPart}</text>
+            `;
+        }
 
     } else {
         // Scatter Plot View (Iddq vs Spatial Channel)
@@ -668,6 +712,8 @@ function renderModuleA() {
             <text x="445" y="68" fill="#da3633" font-size="9" font-weight="bold" text-anchor="end">Spatial 3σ Limit (45 µA)</text>
         `;
 
+        let selectedScatterPoint = null;
+
         spatialDiesData.forEach((die, index) => {
             const px = 60 + ((index % 60) / 60) * 380;
             const py = 200 - Math.min(180, (die.iddq_0h / 65) * 180);
@@ -678,12 +724,18 @@ function renderModuleA() {
             else if (die.flag_spatial || die.iddq_0h > 35) { color = "#f85149"; r = 5.5; }
             else if (die.flag_drift) { color = "#f0883e"; r = 4.5; }
 
+            const isSelected = (die.part_id === selectedAuditPart);
+            if (isSelected) {
+                selectedScatterPoint = { px, py, die };
+            }
+
             const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
             circle.setAttribute("cx", px);
             circle.setAttribute("cy", py);
-            circle.setAttribute("r", r);
+            circle.setAttribute("r", isSelected ? (r + 3) : r);
             circle.setAttribute("fill", color);
-            circle.setAttribute("stroke", "#161b22");
+            circle.setAttribute("stroke", isSelected ? "#ffffff" : "#161b22");
+            circle.setAttribute("stroke-width", isSelected ? "2" : "1");
             circle.style.cursor = "pointer";
 
             circle.onmouseenter = (e) => showDieTooltip(e, die, px, py);
@@ -692,6 +744,16 @@ function renderModuleA() {
 
             diesLayer.appendChild(circle);
         });
+
+        if (selectedScatterPoint) {
+            hudLayer.innerHTML = `
+                <line x1="${selectedScatterPoint.px}" y1="20" x2="${selectedScatterPoint.px}" y2="200" stroke="#58a6ff" stroke-width="1.5" stroke-dasharray="2 3"/>
+                <circle cx="${selectedScatterPoint.px}" cy="${selectedScatterPoint.py}" r="10" fill="none" stroke="#58a6ff" stroke-width="1.5"/>
+                <text x="${selectedScatterPoint.px}" y="${Math.max(30, selectedScatterPoint.py - 14)}" fill="#58a6ff" font-size="9" font-weight="bold" text-anchor="middle">
+                    ${selectedAuditPart} (${selectedScatterPoint.die.iddq_0h} µA)
+                </text>
+            `;
+        }
     }
 }
 
@@ -747,34 +809,55 @@ async function loadDriftSeriesData() {
     const veh = FALLBACK_VEHICLES[currentVehicle] || FALLBACK_VEHICLES["LVM3"];
     const limit = veh.slope_limit || 55.0;
 
-    const interp = (h0, h24, h168) => {
+    const interp = (h0, h24, h96, h168) => {
         return [
             { hour: 0, iddq_uA: h0 },
+            { hour: 12, iddq_uA: Number((h0 + (h24 - h0) * 0.5).toFixed(2)) },
             { hour: 24, iddq_uA: h24 },
-            { hour: 96, iddq_uA: Number((h24 + (h168 - h24) * 0.6).toFixed(2)) },
+            { hour: 48, iddq_uA: Number((h24 + (h96 - h24) * 0.33).toFixed(2)) },
+            { hour: 96, iddq_uA: h96 },
+            { hour: 120, iddq_uA: Number((h96 + (h168 - h96) * 0.33).toFixed(2)) },
             { hour: 168, iddq_uA: h168 }
         ];
     };
 
-    let selH0 = 11.0, selH24 = 24.5, selH168 = 39.0;
+    let selH0 = 11.0, selH24 = 24.5, selH96 = 32.0, selH168 = 39.0;
     if (selectedAuditPart === "PART_088") {
-        selH0 = 10.2; selH24 = 19.5; selH168 = 11.0;
+        selH0 = 10.2; selH24 = 19.5; selH96 = 11.2; selH168 = 11.0;
     } else if (selectedAuditPart === "PART_010") {
-        selH0 = 48.0; selH24 = 50.2; selH168 = 52.0;
+        selH0 = 48.0; selH24 = 50.2; selH96 = 51.4; selH168 = 52.0;
     } else if (selectedAuditPart === "PART_001") {
-        selH0 = 8.5; selH24 = 9.2; selH168 = 10.4;
+        selH0 = 8.5; selH24 = 9.2; selH96 = 9.8; selH168 = 10.4;
+    }
+
+    // Synthesize fleet background curves for realistic look
+    const fleetSamples = [];
+    for (let i = 1; i <= 35; i++) {
+        const pId = `PART_${i < 10 ? '00' + i : '0' + i}`;
+        if (pId === selectedAuditPart) continue;
+        const b0 = 7.5 + (i * 0.35);
+        const b24 = b0 + 0.8 + (Math.random() * 0.6);
+        const b96 = b24 + 0.6 + (Math.random() * 0.6);
+        const b168 = b96 + 0.5 + (Math.random() * 0.5);
+        fleetSamples.push({
+            part_id: pId,
+            exceeds_slope: false,
+            is_weather: false,
+            series: interp(b0, b24, b96, b168)
+        });
     }
 
     driftSeriesData = {
         vehicle: currentVehicle,
         safety_slope_limit: limit,
         selected_part_id: selectedAuditPart,
-        selected_series: interp(selH0, selH24, selH168),
-        nominal_series: interp(8.5, 9.2, 10.4),
-        outlier_series: interp(48.0, 50.2, 52.0),
-        weather_series: interp(10.2, 19.5, 11.0),
-        confidence_upper: interp(10.5, 11.5, 13.0),
-        confidence_lower: interp(6.5, 7.2, 8.0)
+        selected_series: interp(selH0, selH24, selH96, selH168),
+        nominal_series: interp(8.5, 9.2, 9.8, 10.4),
+        outlier_series: interp(48.0, 50.2, 51.4, 52.0),
+        weather_series: interp(10.2, 19.5, 11.2, 11.0),
+        fleet_series: fleetSamples,
+        confidence_upper: interp(10.5, 11.5, 12.2, 13.0),
+        confidence_lower: interp(6.5, 7.2, 7.6, 8.0)
     };
     renderModuleB();
 }
@@ -782,6 +865,7 @@ async function loadDriftSeriesData() {
 function renderModuleB() {
     const gridLayer = document.getElementById("driftGridLayer");
     const corridorLayer = document.getElementById("driftCorridorLayer");
+    const fleetLayer = document.getElementById("driftFleetLayer");
     const curvesLayer = document.getElementById("driftCurvesLayer");
     const sweepLayer = document.getElementById("driftSweepLayer");
     const hudLayer = document.getElementById("driftHudLayer");
@@ -789,6 +873,7 @@ function renderModuleB() {
     if (!gridLayer || !curvesLayer || !driftSeriesData) return;
     gridLayer.innerHTML = "";
     corridorLayer.innerHTML = "";
+    if (fleetLayer) fleetLayer.innerHTML = "";
     curvesLayer.innerHTML = "";
     sweepLayer.innerHTML = "";
     hudLayer.innerHTML = "";
@@ -833,7 +918,17 @@ function renderModuleB() {
         <text x="${xEnd - 10}" y="${slopeYEnd - 6}" fill="#f0883e" font-size="9" font-weight="bold" text-anchor="end">Safety Slope Cutoff (${slopeVal.toFixed(1)} µA)</text>
     `;
 
-    // 3. Shaded Flight Confidence Corridor
+    // Helper to build SVG path from series
+    const buildPath = (series) => {
+        if (!series || series.length === 0) return "";
+        let d = `M ${mapX(series[0].hour)} ${mapY(series[0].iddq_uA)}`;
+        for (let i = 1; i < series.length; i++) {
+            d += ` L ${mapX(series[i].hour)} ${mapY(series[i].iddq_uA)}`;
+        }
+        return d;
+    };
+
+    // 3. Flight Confidence Corridor
     if (driftSeriesData.confidence_upper && driftSeriesData.confidence_lower) {
         let pathD = `M ${mapX(driftSeriesData.confidence_upper[0].hour)} ${mapY(driftSeriesData.confidence_upper[0].iddq_uA)}`;
         driftSeriesData.confidence_upper.forEach(pt => {
@@ -847,20 +942,22 @@ function renderModuleB() {
         corridorLayer.innerHTML = `<path d="${pathD}" fill="url(#nominalCorridorGrad)" stroke="none"/>`;
     }
 
-    // 4. Trajectory Curves Helper
-    const buildPath = (series) => {
-        if (!series || series.length === 0) return "";
-        let d = `M ${mapX(series[0].hour)} ${mapY(series[0].iddq_uA)}`;
-        for (let i = 1; i < series.length; i++) {
-            d += ` L ${mapX(series[i].hour)} ${mapY(series[i].iddq_uA)}`;
-        }
-        return d;
-    };
+    // 4. In "Fleet Overlay" mode, render fleet background curves
+    if (driftViewMode === "fleet" && driftSeriesData.fleet_series && fleetLayer) {
+        driftSeriesData.fleet_series.forEach(item => {
+            if (item.part_id === selectedAuditPart) return;
+            const p = buildPath(item.series);
+            let sColor = "rgba(56, 139, 253, 0.18)";
+            if (item.exceeds_slope) sColor = "rgba(218, 54, 51, 0.25)";
+            else if (item.is_weather) sColor = "rgba(188, 140, 255, 0.25)";
+            fleetLayer.innerHTML += `<path d="${p}" stroke="${sColor}" stroke-width="1" fill="none"/>`;
+        });
+    }
 
     // Nominal Flight Baseline (Green)
     const nominalPath = buildPath(driftSeriesData.nominal_series);
     curvesLayer.innerHTML += `
-        <path d="${nominalPath}" stroke="#238636" stroke-width="2" fill="none" opacity="0.85"/>
+        <path d="${nominalPath}" stroke="#238636" stroke-width="1.8" fill="none" opacity="0.85"/>
         <text x="${mapX(168)}" y="${mapY(10.4) + 14}" fill="#3fb950" font-size="8" text-anchor="end">Nominal Baseline</text>
     `;
 
@@ -871,16 +968,16 @@ function renderModuleB() {
         <text x="${mapX(168)}" y="${mapY(52.0) - 6}" fill="#da3633" font-size="8" text-anchor="end">PART_010 Outlier</text>
     `;
 
-    // Active Inspected Part Curve (Prominent Glow)
+    // Active Inspected Part Curve (Prominent Neon Glow)
     const selSeries = driftSeriesData.selected_series;
     if (selSeries && selSeries.length > 0) {
         const selPath = buildPath(selSeries);
         const isReject = selSeries[selSeries.length - 1].iddq_uA > slopeVal || selectedAuditPart === "PART_025" || selectedAuditPart === "PART_010";
         const isWeather = (selectedAuditPart === "PART_088");
-        const strokeColor = isWeather ? "#bc8cff" : (isReject ? "#f85149" : "#3fb950");
+        const strokeColor = isWeather ? "#bc8cff" : (isReject ? "#f85149" : "#58a6ff");
 
         curvesLayer.innerHTML += `
-            <path d="${selPath}" stroke="${strokeColor}" stroke-width="3" fill="none" filter="url(#glowEffect)" opacity="0.95"/>
+            <path d="${selPath}" stroke="${strokeColor}" stroke-width="3.5" fill="none" filter="url(#glowEffect)" opacity="0.95"/>
             <path d="${selPath}" stroke="${strokeColor}" stroke-width="2.5" fill="none"/>
         `;
 
@@ -896,6 +993,16 @@ function renderModuleB() {
                 ${selectedAuditPart} (${lastPt.iddq_uA} µA)
             </text>
         `;
+
+        // If in precision mode, show callout tags at each key timestamp
+        if (driftViewMode === "precision") {
+            selSeries.forEach(pt => {
+                curvesLayer.innerHTML += `
+                    <rect x="${mapX(pt.hour) - 16}" y="${mapY(pt.iddq_uA) - 22}" width="32" height="14" rx="3" fill="#161b22" stroke="${strokeColor}" stroke-width="1"/>
+                    <text x="${mapX(pt.hour)}" y="${mapY(pt.iddq_uA) - 12}" fill="#ffffff" font-size="8" font-weight="bold" text-anchor="middle">${pt.iddq_uA}µA</text>
+                `;
+            });
+        }
     }
 
     // 5. Sweep Playhead Line
@@ -906,7 +1013,8 @@ function renderModuleB() {
         </g>
     `;
 
-    document.getElementById("oscPartBadge").innerText = `Inspecting: ${selectedAuditPart}`;
+    const badge = document.getElementById("oscPartBadge");
+    if (badge) badge.innerText = `Inspecting: ${selectedAuditPart} (${driftViewMode === 'fleet' ? 'Fleet Overlay' : 'Precision Oscilloscope'})`;
 }
 
 function updateOscilloscopeSweep() {
@@ -1165,7 +1273,12 @@ function renderTableRows(records, total) {
             tagLabel = "Atmospheric Noise";
         }
 
+        const isSelected = (r.part_id === selectedAuditPart);
         const tr = document.createElement("tr");
+        if (isSelected) {
+            tr.className = "table-row-selected";
+        }
+        tr.style.cursor = "pointer";
         tr.onclick = () => selectPartForInspection(r.part_id);
         tr.innerHTML = `
             <td><b>${r.part_id}</b></td>
@@ -1255,8 +1368,20 @@ function selectPartForInspection(partId) {
 
     updateAuditCard();
     loadDriftSeriesData();
-    renderModuleA(); // Refresh selected die glow in Module A
-    showToast(`Loaded Diagnostic Audit for ${partId}`);
+    renderModuleA(); // Refresh selected die reticle in Module A
+    
+    // Highlight selected row in table
+    const rows = document.querySelectorAll("#tableBody tr");
+    rows.forEach(row => {
+        const firstCell = row.querySelector("td b");
+        if (firstCell && firstCell.innerText.trim() === partId) {
+            row.classList.add("table-row-selected");
+        } else {
+            row.classList.remove("table-row-selected");
+        }
+    });
+
+    showToast(`Loaded Diagnostic Audit & Trajectory for ${partId}`);
 }
 
 async function updateAuditCard() {
@@ -1288,11 +1413,56 @@ async function updateAuditCard() {
         bar1_color: "var(--accent-green)",
         bar2_label: "Channel Impedance Stability (85% Impact)",
         bar2_val: "82%",
-        bar2_color: "var(--accent-blue)"
+        bar2_color: "var(--accent-blue)",
+        factor_weights: [
+            { feature: "Baseline Silicon Purity", impact_pct: 54, color: "var(--accent-green)" },
+            { feature: "Channel Impedance Stability", impact_pct: 32, color: "var(--accent-green)" },
+            { feature: "Burn-in Thermal Gradient", impact_pct: 12, color: "var(--accent-blue)" },
+            { feature: "Ground Station EMI Noise", impact_pct: -8, color: "var(--accent-cyan)" }
+        ]
     };
     fallback.part_id = selected;
     applyAuditCardData(fallback);
     loadDriftSeriesData();
+}
+
+function renderTreeSHAP(weights) {
+    const container = document.getElementById("treeshapBarsContainer");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const list = (weights && weights.length > 0) ? weights : [
+        { feature: "Baseline Silicon Purity", impact_pct: 50, color: "var(--accent-green)" },
+        { feature: "Thermal Dissipation Margin", impact_pct: 28, color: "var(--accent-green)" },
+        { feature: "Atmospheric Noise Rejection", impact_pct: 16, color: "var(--accent-blue)" },
+        { feature: "Ground Station EMI Exposure", impact_pct: -12, color: "var(--accent-cyan)" }
+    ];
+
+    list.forEach(item => {
+        const isNeg = item.impact_pct < 0;
+        const absVal = Math.abs(item.impact_pct);
+        const sign = isNeg ? "−" : "+";
+        const badgeClass = isNeg ? "impact-negative" : "impact-positive";
+
+        const row = document.createElement("div");
+        row.className = "treeshap-row";
+        row.innerHTML = `
+            <div class="treeshap-header">
+                <span class="treeshap-name">${item.feature}</span>
+                <span class="treeshap-badge ${badgeClass}">${sign}${absVal}% Impact</span>
+            </div>
+            <div class="treeshap-bar-bg">
+                <div class="treeshap-bar-fill" style="width: 0%; background-color: ${item.color || 'var(--accent-blue)'};"></div>
+            </div>
+        `;
+        container.appendChild(row);
+
+        // Smooth entry animation for the fill width
+        setTimeout(() => {
+            const fill = row.querySelector(".treeshap-bar-fill");
+            if (fill) fill.style.width = `${Math.min(100, Math.max(12, absVal))}%`;
+        }, 40);
+    });
 }
 
 function applyAuditCardData(data) {
@@ -1306,13 +1476,20 @@ function applyAuditCardData(data) {
     document.getElementById("auditDrift").innerText = data.drift_text;
     document.getElementById("auditDrift").style.color = data.drift_color;
 
-    document.getElementById("bar1Label").innerText = data.bar1_label;
-    document.getElementById("bar1").style.width = data.bar1_val;
-    document.getElementById("bar1").style.backgroundColor = data.bar1_color;
+    if (document.getElementById("bar1Label")) document.getElementById("bar1Label").innerText = data.bar1_label || "Primary Attribute";
+    if (document.getElementById("bar1")) {
+        document.getElementById("bar1").style.width = data.bar1_val || "50%";
+        document.getElementById("bar1").style.backgroundColor = data.bar1_color || "var(--accent-green)";
+    }
 
-    document.getElementById("bar2Label").innerText = data.bar2_label;
-    document.getElementById("bar2").style.width = data.bar2_val;
-    document.getElementById("bar2").style.backgroundColor = data.bar2_color;
+    if (document.getElementById("bar2Label")) document.getElementById("bar2Label").innerText = data.bar2_label || "Secondary Attribute";
+    if (document.getElementById("bar2")) {
+        document.getElementById("bar2").style.width = data.bar2_val || "50%";
+        document.getElementById("bar2").style.backgroundColor = data.bar2_color || "var(--accent-blue)";
+    }
+
+    // Render TreeSHAP Factor Weights
+    renderTreeSHAP(data.factor_weights);
 }
 
 // ==========================================

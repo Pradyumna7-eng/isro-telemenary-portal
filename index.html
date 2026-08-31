@@ -117,6 +117,34 @@
             </div>
         </div>
 
+        <!-- Ground Station Environmental & Atmospheric Parameters HUD (Reference Benchmark) -->
+        <div class="env-hud-bar" id="envHudBar">
+            <div class="env-hud-item">
+                <span class="env-hud-title">Ground Station Lot</span>
+                <span class="env-hud-val" id="envLotId" style="color:var(--accent-blue);">LVM3_STAGE_02</span>
+            </div>
+            <div class="env-hud-item">
+                <span class="env-hud-title">Max Iddq Threshold</span>
+                <span class="env-hud-val" id="envMaxIddq" style="color:var(--accent-orange);">55.0 µA</span>
+            </div>
+            <div class="env-hud-item">
+                <span class="env-hud-title">Wind Shear Cap</span>
+                <span class="env-hud-val" id="envWindShear">45 knots</span>
+            </div>
+            <div class="env-hud-item">
+                <span class="env-hud-title">Ground EMI Limit</span>
+                <span class="env-hud-val" id="envEmiLimit">-80 dB</span>
+            </div>
+            <div class="env-hud-item">
+                <span class="env-hud-title">SDSC SHAR Ambient</span>
+                <span class="env-hud-val" style="color:var(--accent-green-bright);">28.4°C | 82% RH</span>
+            </div>
+            <div class="env-hud-item">
+                <span class="env-hud-title">Atmospheric Triggers</span>
+                <span class="env-hud-val" id="envAtmosphericCount" style="color:var(--accent-purple);">12 Spikes</span>
+            </div>
+        </div>
+
         <!-- Dynamic Metrics Grid -->
         <div class="metrics-grid">
             <div class="metric-card">
@@ -151,8 +179,8 @@
                         <span class="live-tag">LIVE SCAN</span>
                     </div>
                     <div style="display:flex; gap:6px;">
-                        <button class="btn-micro" onclick="setWaferViewMode('wafer')" id="btnViewWafer">Wafer Disc</button>
-                        <button class="btn-micro" onclick="setWaferViewMode('scatter')" id="btnViewScatter">Scatter</button>
+                        <button class="btn-micro active" onclick="setWaferViewMode('wafer')" id="btnViewWafer">300mm Wafer</button>
+                        <button class="btn-micro" onclick="setWaferViewMode('scatter')" id="btnViewScatter">Channel Scatter</button>
                     </div>
                 </div>
                 <div class="panel-subtitle">
@@ -189,10 +217,10 @@
                     <!-- Interactive Floating HUD Tooltip -->
                     <div id="waferTooltip" class="canvas-tooltip" style="display:none;"></div>
                 </div>
-                <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:8px;">
-                    <span><span style="color:#58a6ff;">●</span> Nominal Die (<18µA)</span>
-                    <span><span style="color:#bc8cff;">●</span> Atmospheric Noise</span>
-                    <span><span style="color:#f0883e;">●</span> High Thermal Drift</span>
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:8px; flex-wrap:wrap; gap:6px;">
+                    <span><span style="color:#58a6ff;">●</span> Nominal (<18µA)</span>
+                    <span><span style="color:#bc8cff;">●</span> Atmospheric Spike</span>
+                    <span><span style="color:#f0883e;">●</span> High Drift</span>
                     <span><span style="color:#f85149;">●</span> 3σ Spatial Outlier</span>
                     <span id="waferScanReadout" style="color:var(--accent-blue); font-weight:600;">Scan: Active CH-14</span>
                 </div>
@@ -203,12 +231,15 @@
                 <div class="panel-title">
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span>Module B: Accelerated Burn-in Drift Predictor</span>
-                        <span class="live-tag" style="border-color:var(--accent-green); color:var(--accent-green-bright);">OSCILLOSCOPE</span>
+                        <span class="live-tag" style="border-color:var(--accent-green); color:var(--accent-green-bright);">TIME-SERIES</span>
                     </div>
-                    <div style="font-size:11px; color:var(--text-muted);" id="oscPartBadge">Inspecting: PART_025</div>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <button class="btn-micro active" onclick="setDriftViewMode('fleet')" id="btnViewFleet">Fleet Overlay</button>
+                        <button class="btn-micro" onclick="setDriftViewMode('precision')" id="btnViewPrecision">Precision Scope</button>
+                    </div>
                 </div>
                 <div class="panel-subtitle">
-                    Real-time waveform sweep (0h → 24h → 96h → 168h) with confidence corridors & safety slope limit projection.
+                    Full fleet trajectory overlay (0h → 24h → 96h → 168h) with dynamic part spotlight & vehicle safety cutoff limit.
                 </div>
 
                 <div class="chart-container" id="moduleBChart" style="position:relative; overflow:hidden;">
@@ -227,6 +258,7 @@
                         <!-- Dynamic Curves & Playhead Layer -->
                         <g id="driftGridLayer"></g>
                         <g id="driftCorridorLayer"></g>
+                        <g id="driftFleetLayer"></g>
                         <g id="driftCurvesLayer"></g>
                         <g id="driftSweepLayer"></g>
                         <g id="driftHudLayer"></g>
@@ -238,11 +270,11 @@
                         <span id="liveNoiseValue" style="font-family:monospace; font-size:11px; color:var(--text-bright);">12.42 µA | RMS: 0.18 µA | SNR: 44.2 dB</span>
                     </div>
                 </div>
-                <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:8px;">
-                    <span><span style="color:#238636;">―</span> Flight Envelope</span>
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted); margin-top:8px; flex-wrap:wrap; gap:6px;">
+                    <span><span style="color:#238636;">―</span> Safe Fleet Corridor</span>
                     <span><span style="color:#f0883e;">---</span> Safety Slope Cutoff</span>
-                    <span><span style="color:#f85149;">―</span> Active Selected Trajectory</span>
-                    <span><span style="color:#bc8cff;">―</span> EMI Recovery</span>
+                    <span><span style="color:#58a6ff; font-weight:bold;">―●</span> Selected Part</span>
+                    <span><span style="color:#da3633;">---</span> Outliers</span>
                     <span id="driftSlopeValue" style="color:var(--accent-red-bright); font-weight:600;">Slope: +1.17 µA/hr</span>
                 </div>
             </div>
@@ -325,17 +357,20 @@
                     </tbody>
                 </table>
             </div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:8px; display:flex; align-items:center; gap:6px;">
+                <span>💡 <b>Tip:</b> Click on any telemetry row above to spotlight that part's trajectory in both graphs and load its TreeSHAP factor weights.</span>
+            </div>
         </div>
 
-        <!-- Inspection Panel -->
+        <!-- Deep Ground Station Diagnostic Inspection & TreeSHAP Factor Weighting (Feature 2) -->
         <div class="panel">
             <div class="panel-title">
                 <span>🔍 Deep Ground Station Diagnostic Inspection</span>
-                <span style="font-size: 12px; color: var(--accent-blue);">TreeSHAP Feature Attribution</span>
+                <span style="font-size: 12px; color: var(--accent-blue);">TreeSHAP Risk Attribution</span>
             </div>
             <div style="margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                <label for="partSelect" style="font-size:13px; color:var(--text-muted);">Select Telemetry Unit for Audit:</label>
-                <select id="partSelect" onchange="updateAuditCard()" style="min-width: 300px;">
+                <label for="partSelect" style="font-size:13px; color:var(--text-muted); font-weight:600;">Select Telemetry Unit for Inspection:</label>
+                <select id="partSelect" onchange="updateAuditCard()" style="min-width: 320px; font-weight:600;">
                     <option value="PART_088" selected>PART_088 (Ground Station Rain/Thunder EMI)</option>
                     <option value="PART_010">PART_010 (Hardware Spatial Pinholes)</option>
                     <option value="PART_025">PART_025 (Exceeds Safety Slope Drift)</option>
@@ -347,23 +382,20 @@
                     <div id="auditStatus" style="color: var(--accent-purple); font-weight: bold; font-size: 15px; margin-bottom: 8px;">
                         STATUS: ATMOSPHERIC NOISE (RE-SCREEN)
                     </div>
-                    <p><b>Component ID:</b> <span id="auditPartId">PART_088</span></p>
-                    <p><b>Anomaly Category:</b> <span id="auditCategory" style="color:var(--accent-purple);">Environmental Noise Drift</span></p>
+                    <p><b>Component ID:</b> <span id="auditPartId" style="font-weight:bold; color:var(--accent-blue);">PART_088</span></p>
+                    <p><b>Anomaly Category:</b> <span id="auditCategory" style="color:var(--accent-purple); font-weight:600;">Environmental Noise Drift</span></p>
                     <p><b>Sensing Channel:</b> <span id="auditSensor">Ground Station EMI & Weather Sensor Array</span></p>
                     <p><b>Atmospheric / Physical Factor:</b> <br><i id="auditFactor" style="color:var(--text-muted);">Thunderstorm EMI Pulse (-35 dB) & Rain Rate (18.5 mm/hr) at T=24h</i></p>
                     <p><b>Forecast 168h Drift:</b> <span id="auditDrift" style="color:#3fb950; font-weight:bold;">11.00 µA (Transient Spike - Safe for Flight)</span></p>
                 </div>
                 <div>
-                    <h4 style="margin:0 0 14px 0; font-size:14px; color:var(--accent-blue);">Ground Station Factor Weighting (TreeSHAP Risk Attribution)</h4>
+                    <h4 style="margin:0 0 12px 0; font-size:14px; color:var(--accent-blue); display:flex; justify-content:space-between; align-items:center;">
+                        <span>Ground Station Factor Weighting (TreeSHAP)</span>
+                        <span style="font-size:11px; color:var(--text-muted); font-weight:normal;">Impact % Contribution</span>
+                    </h4>
                     
-                    <div id="bar1Label" style="font-size: 12px; margin-bottom: 6px;">Thunderstorm EMI Spike Weight (-65% Impact)</div>
-                    <div style="background:#30363d; border-radius:4px; height:12px; width:100%; margin-bottom:16px;">
-                        <div id="bar1" style="background:var(--accent-purple); height:100%; width:85%; border-radius:4px; transition: width 0.4s ease;"></div>
-                    </div>
-
-                    <div id="bar2Label" style="font-size: 12px; margin-bottom: 6px;">Rain Attenuation Humidity Rate (+25% Impact)</div>
-                    <div style="background:#30363d; border-radius:4px; height:12px; width:100%;">
-                        <div id="bar2" style="background:var(--accent-blue); height:100%; width:40%; border-radius:4px; transition: width 0.4s ease;"></div>
+                    <div class="treeshap-container" id="treeshapBarsContainer">
+                        <!-- Dynamic TreeSHAP factor bars rendered via JS -->
                     </div>
                 </div>
             </div>

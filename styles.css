@@ -405,22 +405,144 @@ tbody tr:hover {
 .tag-drift { background: rgba(240, 136, 62, 0.2); color: var(--accent-orange); border: 1px solid var(--accent-orange); }
 .tag-weather { background: rgba(188, 140, 255, 0.2); color: var(--accent-purple); border: 1px solid var(--accent-purple); }
 
-/* AUDIT DEEP INSPECTION CARD */
+/* AUDIT DEEP INSPECTION CARD & TREESHAP VISUALIZER */
 .audit-card {
     display: grid;
-    grid-template-columns: 1.2fr 1.8fr;
+    grid-template-columns: 1fr 1.3fr;
     gap: 20px;
-    background-color: #21262d;
+    background-color: #1c2128;
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 20px;
     margin-top: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 900px) {
+    .audit-card {
+        grid-template-columns: 1fr;
+    }
 }
 
 .audit-info p {
     margin: 8px 0;
     font-size: 13px;
     line-height: 1.5;
+}
+
+/* TreeSHAP Horizontal Factor Bars */
+.treeshap-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.treeshap-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.treeshap-header, .treeshap-row-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+}
+
+.treeshap-name, .treeshap-label {
+    font-weight: 600;
+    color: var(--text-main);
+}
+
+.treeshap-badge, .treeshap-pct-badge {
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 7px;
+    border-radius: 4px;
+    letter-spacing: 0.3px;
+}
+
+.impact-positive {
+    background: rgba(35, 134, 54, 0.25);
+    color: var(--accent-green-bright);
+    border: 1px solid rgba(59, 185, 80, 0.4);
+}
+
+.impact-negative {
+    background: rgba(88, 166, 255, 0.2);
+    color: var(--accent-cyan);
+    border: 1px solid rgba(88, 166, 255, 0.4);
+}
+
+.treeshap-bar-bg, .treeshap-track {
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    height: 12px;
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+.treeshap-bar-fill, .treeshap-bar {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s ease;
+}
+
+/* Atmospheric Environmental HUD Bar */
+.env-hud-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    background: #1c2128;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px 18px;
+    margin-bottom: 20px;
+    align-items: center;
+}
+
+.env-hud-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.env-hud-title {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.env-hud-val {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-bright);
+    font-family: monospace;
+}
+
+/* Selected row in register table */
+tbody tr.table-row-selected {
+    background-color: rgba(88, 166, 255, 0.15) !important;
+    border-left: 3px solid var(--accent-blue);
+}
+
+/* Reticle and laser glow */
+.interactive-die:hover {
+    filter: drop-shadow(0 0 6px rgba(88, 166, 255, 0.9));
+}
+
+.interactive-die.selected-die {
+    animation: diePulse 1.2s infinite alternate;
+}
+
+@keyframes diePulse {
+    0% { transform: scale(1); filter: drop-shadow(0 0 4px #fff); }
+    100% { transform: scale(1.4); filter: drop-shadow(0 0 10px #58a6ff); }
 }
 
 /* MODAL STYLES */

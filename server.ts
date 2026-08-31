@@ -361,14 +361,14 @@ app.get("/api/telemetry/drift-series", (req: Request, res: Response) => {
   const base = VEHICLE_DEFAULTS[vehicle] || VEHICLE_DEFAULTS["LVM3"];
   const slopeLimit = base.slope_limit || 55.0;
 
-  // Return curves for: Selected Part (or PART_025), Outlier PART_010, Weather PART_088, Nominal Baseline, and Confidence Bands
+  const comps = dataStore.getByVehicle(vehicle);
   const selectedPart = req.query.partId as string || "PART_025";
   const doc = dataStore.getById(selectedPart) || dataStore.getById(`${vehicle}-${selectedPart}`);
 
-  const v0 = doc ? doc.Iddq_uA_0h : 11.0;
-  const v24 = doc ? doc.Iddq_uA_24h : 24.5;
-  const v96 = doc?.Iddq_uA_96h || (v24 + (v24 - v0) * 2.8);
-  const v168 = doc?.Iddq_uA_pred168h || (v0 + (v24 - v0) / 24 * 168 * 1.15);
+  const v0 = doc ? doc.Iddq_uA_0h : (selectedPart === "PART_010" ? 48.0 : (selectedPart === "PART_088" ? 10.2 : 11.0));
+  const v24 = doc ? doc.Iddq_uA_24h : (selectedPart === "PART_010" ? 50.2 : (selectedPart === "PART_088" ? 19.5 : 24.5));
+  const v96 = doc?.Iddq_uA_96h || (selectedPart === "PART_088" ? 11.2 : (v24 + (v24 - v0) * 1.5));
+  const v168 = doc?.Iddq_uA_pred168h || (selectedPart === "PART_088" ? 11.0 : (v0 + (v24 - v0) / 24 * 168 * 1.15));
 
   const hours = [0, 12, 24, 48, 72, 96, 120, 144, 168];
 
@@ -391,6 +391,24 @@ app.get("/api/telemetry/drift-series", (req: Request, res: Response) => {
   const outlierSeries = interp(48.0, 50.2, 51.4, 53.0);
   const weatherSeries = interp(10.2, 19.5, 11.2, 11.0);
 
+  // Generate fleet background trajectories
+  const fleetSeries = (comps.length > 0 ? comps : dataStore.getAll()).slice(0, 75).map(c => {
+    const pId = c.component_id.replace(`${vehicle}-`, "");
+    const c0 = c.Iddq_uA_0h;
+    const c24 = c.Iddq_uA_24h;
+    const c96 = c.Iddq_uA_96h || (c24 + (c24 - c0) * 1.4);
+    const c168 = c.Iddq_uA_pred168h || (c24 * 1.05);
+    const exceeds = c.flag_B || c168 > slopeLimit;
+    const isWeather = !!c.weather_flag;
+
+    return {
+      part_id: pId,
+      exceeds_slope: exceeds,
+      is_weather: isWeather,
+      series: interp(c0, c24, c96, c168)
+    };
+  });
+
   res.json({
     vehicle,
     safety_slope_limit: slopeLimit,
@@ -399,6 +417,7 @@ app.get("/api/telemetry/drift-series", (req: Request, res: Response) => {
     nominal_series: nominalSeries,
     outlier_series: outlierSeries,
     weather_series: weatherSeries,
+    fleet_series: fleetSeries,
     confidence_upper: nominalSeries.map(p => ({ hour: p.hour, iddq_uA: Number((p.iddq_uA * 1.25).toFixed(2)) })),
     confidence_lower: nominalSeries.map(p => ({ hour: p.hour, iddq_uA: Number((p.iddq_uA * 0.85).toFixed(2)) })),
   });
@@ -427,63 +446,86 @@ app.get("/api/telemetry/topology", (req: Request, res: Response) => {
 
 app.get("/api/diagnostics/inspection/:partId", (req: Request, res: Response) => {
   const partId = req.params.partId;
-  if (DETAILED_INSPECTIONS[partId]) {
-    return res.json(DETAILED_INSPECTIONS[partId]);
-  }
-
   const doc = dataStore.getById(partId) || dataStore.getById(`LVM3-${partId}`) || dataStore.getById(`PSLV-${partId}`) || dataStore.getById(`SSLV-${partId}`);
-  if (doc) {
-    let statusText = "STATUS: CLEARED FOR FLIGHT (NOMINAL)";
-    let statusColor = "#3fb950";
-    let cat = "Nominal Flight Telemetry";
 
-    if (doc.weather_flag) {
-      statusText = "STATUS: ATMOSPHERIC NOISE (RE-SCREEN)";
-      statusColor = "var(--accent-purple)";
-      cat = "Environmental Noise Drift";
-    } else if (doc.flag_A) {
-      statusText = "STATUS: HARDWARE REJECT";
-      statusColor = "var(--accent-red)";
-      cat = "Spatial Parametric Outlier";
-    } else if (doc.flag_B) {
-      statusText = "STATUS: EARLY REJECTION (SAFETY SLOPE EXCEEDED)";
-      statusColor = "var(--accent-red)";
-      cat = "Time-Series Drift Slope Violation";
-    }
-
+  if (partId === "PART_088" || doc?.weather_flag) {
     return res.json({
       part_id: partId,
-      status_text: statusText,
-      status_color: statusColor,
-      category: cat,
-      sensor: "Avionics Multi-channel Bus",
-      factor: doc.final_explanation || "Baseline silicon and burn-in verified",
-      drift_text: `${(doc.Iddq_uA_pred168h || doc.Iddq_uA_24h * 1.04).toFixed(2)} µA`,
-      drift_color: doc.final_flag ? "var(--accent-red)" : "#3fb950",
-      bar1_label: "Silicon Parametric Linearity (+82%)",
-      bar1_val: "82%",
-      bar1_color: doc.final_flag ? "var(--accent-red)" : "var(--accent-green)",
-      bar2_label: "Substrate Thermal Dissipation (+45%)",
-      bar2_val: "45%",
-      bar2_color: "var(--accent-blue)"
+      status_text: "STATUS: ATMOSPHERIC NOISE (RE-SCREEN)",
+      status_color: "var(--accent-purple)",
+      category: "Environmental Noise Drift",
+      sensor: "Ground Station EMI & Weather Sensor Array",
+      factor: "Thunderstorm EMI Pulse (-35 dB) & Rain Rate (18.5 mm/hr) at T=24h",
+      drift_text: "11.00 µA (Transient Spike - Safe for Flight)",
+      drift_color: "#3fb950",
+      factor_weights: [
+        { feature: "Thunderstorm EMI Coupling", impact_pct: -65, color: "var(--accent-purple)" },
+        { feature: "Rain Attenuation Humidity", impact_pct: 25, color: "var(--accent-blue)" },
+        { feature: "Ground Station Ambient Pulse", impact_pct: -15, color: "var(--accent-purple)" },
+        { feature: "Baseline Silicon Purity", impact_pct: 12, color: "var(--accent-green)" },
+        { feature: "Channel Thermal Dissipation", impact_pct: 8, color: "var(--accent-green)" }
+      ]
     });
   }
 
+  if (partId === "PART_010" || doc?.flag_A) {
+    return res.json({
+      part_id: partId,
+      status_text: "STATUS: HARDWARE REJECT",
+      status_color: "var(--accent-red-bright)",
+      category: "Spatial Parametric Outlier",
+      sensor: "Iddq Static Leakage Sensor Channel",
+      factor: "Gate Oxide Pinholes / Substrate Micro-cracks",
+      drift_text: "Exceeds Z-Score Outlier Bound (52.0 µA)",
+      drift_color: "var(--accent-red-bright)",
+      factor_weights: [
+        { feature: "0h Initial Parametric Leakage", impact_pct: 75, color: "var(--accent-red-bright)" },
+        { feature: "Wafer Edge Radial Deviation", impact_pct: 28, color: "var(--accent-orange)" },
+        { feature: "Thermal Gradient Acceleration", impact_pct: 15, color: "var(--accent-blue)" },
+        { feature: "Ground Station EMI Coupling", impact_pct: -8, color: "var(--accent-cyan)" },
+        { feature: "Lot Deviation Skew", impact_pct: 14, color: "var(--accent-orange)" }
+      ]
+    });
+  }
+
+  if (partId === "PART_025" || doc?.flag_B) {
+    return res.json({
+      part_id: partId,
+      status_text: "STATUS: EARLY REJECTION (SAFETY SLOPE EXCEEDED)",
+      status_color: "var(--accent-red-bright)",
+      category: "Time-Series Drift Slope Violation",
+      sensor: "Thermal Transient Channel",
+      factor: "Predicted 168h Drift exceeds Calculated Safety Slope Limit",
+      drift_text: "Forecast Slope Exceeds Limit (39.0 µA)",
+      drift_color: "var(--accent-red-bright)",
+      factor_weights: [
+        { feature: "24h Burn-in Drift Delta", impact_pct: 68, color: "var(--accent-red-bright)" },
+        { feature: "Thermal Gradient Acceleration", impact_pct: 26, color: "var(--accent-orange)" },
+        { feature: "Safety Slope Cutoff Deviation", impact_pct: 22, color: "var(--accent-red-bright)" },
+        { feature: "0h Baseline Static Leakage", impact_pct: 12, color: "var(--accent-blue)" },
+        { feature: "Ground Station EMI Coupling", impact_pct: -5, color: "var(--accent-cyan)" }
+      ]
+    });
+  }
+
+  // Nominal qualified component
+  const pred168 = doc ? (doc.Iddq_uA_pred168h || doc.Iddq_uA_24h * 1.04) : 10.4;
   res.json({
     part_id: partId,
-    status_text: "STATUS: NOMINAL (QUALIFIED)",
+    status_text: "STATUS: CLEARED FOR FLIGHT (SPACE QUALIFIED)",
     status_color: "#3fb950",
     category: "Nominal Flight Telemetry",
     sensor: "Avionics Multi-channel Bus",
-    factor: "All burn-in and spatial parameters within baseline limits",
-    drift_text: "12.00 µA (Safe for launch integration)",
+    factor: doc?.final_explanation || "All burn-in and spatial parameters within baseline limits",
+    drift_text: `${Number(pred168).toFixed(2)} µA (Space Qualified Baseline)`,
     drift_color: "#3fb950",
-    bar1_label: "Baseline Silicon Purity (90% Impact)",
-    bar1_val: "88%",
-    bar1_color: "var(--accent-green)",
-    bar2_label: "Channel Impedance Stability (85% Impact)",
-    bar2_val: "82%",
-    bar2_color: "var(--accent-blue)"
+    factor_weights: [
+      { feature: "Baseline Silicon Purity", impact_pct: 52, color: "var(--accent-green)" },
+      { feature: "Channel Impedance Stability", impact_pct: 34, color: "var(--accent-green)" },
+      { feature: "Thermal Dissipation Margin", impact_pct: 18, color: "var(--accent-blue)" },
+      { feature: "Ground Station EMI Suppression", impact_pct: -12, color: "var(--accent-cyan)" },
+      { feature: "Burn-in Linearity", impact_pct: 8, color: "var(--accent-blue)" }
+    ]
   });
 });
 
