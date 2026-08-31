@@ -594,6 +594,35 @@ tbody tr.table-row-selected {
     box-shadow: 0 0 8px rgba(88, 166, 255, 0.4);
 }
 
+.spotlight-pill {
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: monospace;
+    letter-spacing: 0.4px;
+    display: inline-flex;
+    align-items: center;
+}
+
+.pill-cleared {
+    background: rgba(35, 134, 54, 0.2);
+    border: 1px solid rgba(63, 185, 80, 0.5);
+    color: #3fb950;
+}
+
+.pill-weather {
+    background: rgba(188, 140, 255, 0.2);
+    border: 1px solid rgba(188, 140, 255, 0.5);
+    color: #bc8cff;
+}
+
+.pill-reject {
+    background: rgba(218, 54, 51, 0.2);
+    border: 1px solid rgba(248, 81, 73, 0.5);
+    color: #f85149;
+}
+
 /* Ground Station Leakage Boxes */
 .leakage-phase-box {
     background: #0d1117;

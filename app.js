@@ -920,6 +920,15 @@ async function loadDriftSeriesData() {
         confidence_upper: interp(10.5, 11.5, 12.2, 13.0),
         confidence_lower: interp(6.5, 7.2, 7.6, 8.0)
     };
+
+    const slopeElem = document.getElementById("driftSlopeValue");
+    if (slopeElem) {
+        const driftSlope = (selH168 - selH0) / 168;
+        const isViolated = (selH168 > limit) || (driftSlope > 0.22);
+        slopeElem.innerText = `Slope: ${driftSlope >= 0 ? '+' : ''}${driftSlope.toFixed(3)} µA/hr (${isViolated ? 'EXCEEDS LIMIT' : 'NOMINAL'})`;
+        slopeElem.style.color = isViolated ? "var(--accent-red-bright)" : "var(--accent-green-bright)";
+    }
+
     renderModuleB();
 }
 
@@ -1054,6 +1063,15 @@ function renderModuleB() {
                 ${selectedAuditPart} (${lastPt.iddq_uA} µA)
             </text>
         `;
+
+        const slopeElem = document.getElementById("driftSlopeValue");
+        if (slopeElem) {
+            const firstPt = selSeries[0];
+            const driftSlope = (lastPt.iddq_uA - firstPt.iddq_uA) / (lastPt.hour || 168);
+            const isViolated = (lastPt.iddq_uA > slopeVal) || isReject;
+            slopeElem.innerText = `Slope: ${driftSlope >= 0 ? '+' : ''}${driftSlope.toFixed(3)} µA/hr (${isViolated ? 'EXCEEDS LIMIT' : 'NOMINAL'})`;
+            slopeElem.style.color = isViolated ? "var(--accent-red-bright)" : "var(--accent-green-bright)";
+        }
 
         // If in precision mode, show callout tags at each key timestamp
         if (driftViewMode === "precision") {
@@ -1379,7 +1397,7 @@ function nextPage() {
 let currentSpotlightFilter = "ALL";
 
 function populateComponentDropdowns(targetPartId) {
-    const globalSel = document.getElementById("globalPartSelect");
+    const graphSel = document.getElementById("graphPartSelect") || document.getElementById("globalPartSelect");
     const panelSel = document.getElementById("partSelect");
     
     // Gather all unique part records for the current vehicle
@@ -1391,7 +1409,10 @@ function populateComponentDropdowns(targetPartId) {
             status: d.status,
             anomaly_category: d.status === "CLEARED" ? "NOMINAL" : (d.flag_drift ? "THERMAL_DRIFT" : (d.status === "RE_SCREEN" ? "ATMOSPHERIC_NOISE" : "SPATIAL_OUTLIER")),
             sensing_channel: `Channel ${d.die_x},${d.die_y}`,
-            failure_factor: d.status === "CLEARED" ? "Nominal Silicon Baseline" : "Burn-in Parametric Shift"
+            failure_factor: d.status === "CLEARED" ? "Nominal Silicon Baseline" : (d.status === "RE_SCREEN" ? "Atmospheric Transient Spike" : "Burn-in Parametric Shift"),
+            iddq_0h: d.iddq_0h,
+            iddq_24h: d.iddq_24h,
+            iddq_168h: d.iddq_168h
         }));
     }
 
@@ -1400,35 +1421,30 @@ function populateComponentDropdowns(targetPartId) {
     if (currentSpotlightFilter === "CLEARED") {
         filtered = records.filter(r => r.status === "CLEARED");
     } else if (currentSpotlightFilter === "REJECT") {
-        filtered = records.filter(r => r.status === "REJECT" || r.anomaly_category === "SPATIAL_OUTLIER" || r.anomaly_category === "THERMAL_DRIFT");
+        filtered = records.filter(r => r.status === "REJECT" || r.status === "REJECTED" || r.anomaly_category === "SPATIAL_OUTLIER" || r.anomaly_category === "THERMAL_DRIFT");
     } else if (currentSpotlightFilter === "ATMOSPHERIC") {
         filtered = records.filter(r => r.status === "RE_SCREEN" || r.anomaly_category === "ATMOSPHERIC_NOISE");
     }
 
     const currentSelected = targetPartId || selectedAuditPart;
 
-    if (globalSel) {
-        globalSel.innerHTML = "";
-        filtered.forEach(r => {
+    const buildOptions = (selElem, list) => {
+        if (!selElem) return;
+        selElem.innerHTML = "";
+        list.forEach(r => {
             const opt = document.createElement("option");
             opt.value = r.part_id;
-            opt.innerText = `${r.part_id} — [${r.status}] ${r.sensing_channel || ''}`;
+            const factorSnippet = r.failure_factor ? r.failure_factor.substring(0, 36) : 'Nominal';
+            const statusTag = r.status === "CLEARED" ? "PASS" : (r.status === "RE_SCREEN" ? "WEATHER" : "REJECT");
+            const valTag = (r.iddq_0h || r.iddq_0h_uA) ? ` (${r.iddq_0h || r.iddq_0h_uA}µA)` : '';
+            opt.innerText = `${r.part_id} — [${statusTag}] ${factorSnippet}${valTag}`;
             if (r.part_id === currentSelected) opt.selected = true;
-            globalSel.appendChild(opt);
+            selElem.appendChild(opt);
         });
-    }
+    };
 
-    if (panelSel) {
-        panelSel.innerHTML = "";
-        records.forEach(r => {
-            const opt = document.createElement("option");
-            opt.value = r.part_id;
-            const factorSnippet = r.failure_factor ? r.failure_factor.substring(0, 32) : 'Nominal';
-            opt.innerText = `${r.part_id} (${factorSnippet}...)`;
-            if (r.part_id === currentSelected) opt.selected = true;
-            panelSel.appendChild(opt);
-        });
-    }
+    buildOptions(graphSel, filtered);
+    buildOptions(panelSel, records);
 }
 
 function filterSpotlightList(filterType, btnElem) {
@@ -1440,34 +1456,34 @@ function filterSpotlightList(filterType, btnElem) {
     populateComponentDropdowns();
     
     // If the currently selected part is not in the filtered list, select the first available item
-    const globalSel = document.getElementById("globalPartSelect");
-    if (globalSel && globalSel.options.length > 0) {
+    const graphSel = document.getElementById("graphPartSelect") || document.getElementById("globalPartSelect");
+    if (graphSel && graphSel.options.length > 0) {
         let isPresent = false;
-        for (let opt of globalSel.options) {
+        for (let opt of graphSel.options) {
             if (opt.value === selectedAuditPart) {
                 isPresent = true;
                 break;
             }
         }
-        if (!isPresent && globalSel.options[0]) {
-            selectPartForInspection(globalSel.options[0].value);
+        if (!isPresent && graphSel.options[0]) {
+            selectPartForInspection(graphSel.options[0].value);
         }
     }
 }
 
 function stepComponent(direction) {
-    const globalSel = document.getElementById("globalPartSelect");
-    if (!globalSel || globalSel.options.length === 0) return;
+    const graphSel = document.getElementById("graphPartSelect") || document.getElementById("globalPartSelect");
+    if (!graphSel || graphSel.options.length === 0) return;
 
-    let currentIndex = globalSel.selectedIndex;
+    let currentIndex = graphSel.selectedIndex;
     if (currentIndex === -1) currentIndex = 0;
 
     let nextIndex = currentIndex + direction;
-    if (nextIndex < 0) nextIndex = globalSel.options.length - 1;
-    if (nextIndex >= globalSel.options.length) nextIndex = 0;
+    if (nextIndex < 0) nextIndex = graphSel.options.length - 1;
+    if (nextIndex >= graphSel.options.length) nextIndex = 0;
 
-    globalSel.selectedIndex = nextIndex;
-    selectPartForInspection(globalSel.options[nextIndex].value);
+    graphSel.selectedIndex = nextIndex;
+    selectPartForInspection(graphSel.options[nextIndex].value);
 }
 
 async function loadInspectionOptions() {
@@ -1490,11 +1506,11 @@ async function loadInspectionOptions() {
 function selectPartForInspection(partId) {
     selectedAuditPart = partId;
 
-    // 1. Sync Spotlight Bar Select
-    const globalSel = document.getElementById("globalPartSelect");
-    if (globalSel) {
+    // 1. Sync Graph Selector
+    const graphSel = document.getElementById("graphPartSelect") || document.getElementById("globalPartSelect");
+    if (graphSel) {
         let found = false;
-        for (let opt of globalSel.options) {
+        for (let opt of graphSel.options) {
             if (opt.value === partId) {
                 opt.selected = true;
                 found = true;
@@ -1505,7 +1521,7 @@ function selectPartForInspection(partId) {
             const opt = document.createElement("option");
             opt.value = partId;
             opt.innerText = `${partId} — Selected Component`;
-            globalSel.prepend(opt);
+            graphSel.prepend(opt);
             opt.selected = true;
         }
     }
